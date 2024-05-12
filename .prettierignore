@@ -1,4 +1,12 @@
-# Ignore files for PNPM, NPM and YARN
-pnpm-lock.yaml
+dist
+assets
+public
+
+.yarn
+.husky
 package-lock.json
-yarn.lock
+.yarnrc.yml
+
+*.glsl
+*.vert
+*.frag
