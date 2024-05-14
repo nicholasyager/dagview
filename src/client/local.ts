@@ -1,34 +1,38 @@
-import { LoadingManager } from 'three'
+import { LoadingManager } from 'three';
 
 export interface DbtNode {
-  resource_type: string
-  unique_id: string
+  resource_type: string;
+  unique_id: string;
 }
 
 export interface Manifest {
   nodes: {
-    [key: string]: DbtNode
-  }
+    [key: string]: DbtNode;
+  };
+  sources: {
+    [key: string]: DbtNode;
+  };
+
   child_map: {
-    [key: string]: string[]
-  }
+    [key: string]: string[];
+  };
   parent_map: {
-    [key: string]: string[]
-  }
+    [key: string]: string[];
+  };
 }
 
 export async function getManifest(path: string): Promise<Manifest> {
-  const response = await fetch(path)
-  const manifest = await response.json()
-  return manifest
+  const response = await fetch(path);
+  const manifest = await response.json();
+  return manifest;
 }
 
 export class ManifestLoader {
-  loadingManager: LoadingManager
+  loadingManager: LoadingManager;
 
   constructor(loadingManager: LoadingManager) {
-    console.log('Created ManifestLoader')
-    this.loadingManager = loadingManager
+    console.log('Created ManifestLoader');
+    this.loadingManager = loadingManager;
   }
 
   load(
@@ -39,15 +43,15 @@ export class ManifestLoader {
   ): void {
     fetch(url)
       .then((response) => {
-        if (onProgress) onProgress({ url, loaded: 1, total: 1 })
-        return response.json()
+        if (onProgress) onProgress({ url, loaded: 1, total: 1 });
+        return response.json();
       })
       .then((manifest) => {
-        if (onLoad) onLoad(manifest)
-        this.loadingManager.onLoad()
+        if (onLoad) onLoad(manifest);
+        this.loadingManager.onLoad();
       })
       .catch((error) => {
-        if (onError) onError(error)
-      })
+        if (onError) onError(error);
+      });
   }
 }

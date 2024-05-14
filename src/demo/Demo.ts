@@ -65,6 +65,10 @@ export class Demo implements Experience {
       this.graph.addNode(key, value);
     }
 
+    for (let [key, value] of Object.entries(manifest.sources)) {
+      this.graph.addNode(key, value);
+    }
+
     for (let [source, targets] of Object.entries(manifest.child_map)) {
       if (source.startsWith('test')) continue;
       if (!this.graph.hasNode(source)) continue;
@@ -116,29 +120,10 @@ export class Demo implements Experience {
       }
     }
 
-    // const plane = new THREE.Mesh(
-    //   new THREE.PlaneGeometry(10, 10),
-    //   new THREE.MeshStandardMaterial({ color: 0xffffff })
-    // );
-
-    // plane.rotation.x = -Math.PI / 2;
-    // plane.receiveShadow = false;
-
-    // this.engine.scene.add(plane)
-    // this.engine.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-    // let directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    // directionalLight.castShadow = true;
-    // directionalLight.position.set(2, 2, 2);
-
-    // this.engine.scene.add(directionalLight);
-
     var directedBetweenness: { [key: string]: number } = centrality.betweenness(
       this.graph,
       true
     );
-    console.log(Object.values(directedBetweenness));
-
     const maxBetweenness = Math.max(...Object.values(directedBetweenness));
 
     console.log(maxBetweenness);
