@@ -1,21 +1,28 @@
-import * as THREE from 'three'
-import vertexShader from './shader.vert'
-import fragmentShader from './shader.frag'
+import * as THREE from 'three';
+
+export interface GraphNodeStatistics {
+  betweenness: number;
+}
 
 export class GraphNode extends THREE.Mesh {
-  uniqueId: string
-  nodeData: object
+  uniqueId: string;
+  nodeData: object;
 
-  constructor(uniqueId: string, nodeData: Object) {
-    const geometry = new THREE.SphereGeometry(0.1)
+  constructor(
+    uniqueId: string,
+    nodeData: Object,
+    radius: number,
+    statistics: GraphNodeStatistics
+  ) {
+    const geometry = new THREE.SphereGeometry(radius);
     const material = new THREE.MeshStandardMaterial({
       color: 0x222222,
-      emissive: 0xed7014,
-    })
+      emissive: 0xff0000,
+    });
 
-    super(geometry, material)
+    super(geometry, material);
 
-    this.uniqueId = uniqueId
-    this.nodeData = nodeData
+    this.uniqueId = uniqueId;
+    this.nodeData = nodeData;
   }
 }

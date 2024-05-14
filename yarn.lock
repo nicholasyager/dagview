@@ -1116,6 +1116,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"manifest_cloud@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "manifest_cloud@workspace:."
+  dependencies:
+    "@types/three": ^0.156.0
+    "@vitejs/plugin-basic-ssl": ^1.1.0
+    husky: ^8.0.3
+    lil-gui: ^0.18.2
+    lint-staged: ^13.3.0
+    ngraph.centrality: ^2.1.0
+    ngraph.forcelayout: ^3.3.1
+    ngraph.graph: ^20.0.1
+    prettier: 2.8.8
+    sass: ^1.69.0
+    three: ^0.157.0
+    typescript: ^5.2.2
+    vite: ^4.4.11
+    vite-plugin-glsl: ^1.1.2
+  languageName: unknown
+  linkType: soft
+
 "merge-stream@npm:^2.0.0":
   version: 2.0.0
   resolution: "merge-stream@npm:2.0.0"
@@ -1278,6 +1299,13 @@ __metadata:
   version: 0.6.3
   resolution: "negotiator@npm:0.6.3"
   checksum: b8ffeb1e262eff7968fc90a2b6767b04cfd9842582a9d0ece0af7049537266e7b2506dfb1d107a32f06dd849ab2aea834d5830f7f4d0e5cb7d36e1ae55d021d9
+  languageName: node
+  linkType: hard
+
+"ngraph.centrality@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "ngraph.centrality@npm:2.1.0"
+  checksum: d8ddba0bdef9950907912f1fe7336544ebc0c653df0d99b5e121dd25695e4a0fe3e20e6497082a10d1dc3c31f12014bcc07db92eb79b8c876aa7fc60cd7bb95e
   languageName: node
   linkType: hard
 
@@ -1772,26 +1800,6 @@ __metadata:
   checksum: 444797461c9db09d8a4cad886e494c2e6dd5754f09ac7ac4af75a3bf1143ae79641388db31999edcc76c5dba9677639f09da2df8d0128396a1dd59e41226c85c
   languageName: node
   linkType: hard
-
-"threejs-ts-starter@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "threejs-ts-starter@workspace:."
-  dependencies:
-    "@types/three": ^0.156.0
-    "@vitejs/plugin-basic-ssl": ^1.1.0
-    husky: ^8.0.3
-    lil-gui: ^0.18.2
-    lint-staged: ^13.3.0
-    ngraph.forcelayout: ^3.3.1
-    ngraph.graph: ^20.0.1
-    prettier: 2.8.8
-    sass: ^1.69.0
-    three: ^0.157.0
-    typescript: ^5.2.2
-    vite: ^4.4.11
-    vite-plugin-glsl: ^1.1.2
-  languageName: unknown
-  linkType: soft
 
 "to-regex-range@npm:^5.0.1":
   version: 5.0.1
