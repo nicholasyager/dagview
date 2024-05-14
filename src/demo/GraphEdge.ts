@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as d3 from 'd3';
 
 export class GraphEdge extends THREE.Line {
   constructor(source: THREE.Vector3, target: THREE.Vector3) {
@@ -22,14 +23,18 @@ export class GraphEdge2 extends THREE.Points {
   // sampledPointIndices: number[];
   time: number;
 
-  constructor(source: THREE.Vector3, target: THREE.Vector3) {
+  constructor(
+    source: THREE.Vector3,
+    target: THREE.Vector3,
+    color: THREE.Color
+  ) {
     const curve = new THREE.CatmullRomCurve3([source, target]);
 
     const particleCount = 20; // Adjust the number of particles as desired
     const points = curve.getSpacedPoints(particleCount);
 
     const particleSize = 0.075; // Adjust the size of the particles
-    const particleColor = 0xcccccc; // Adjust the color of the particles
+    const particleColor = color; // Adjust the color of the particles
 
     // let sampledPoints = [];
     // let sampledPointIndices = [];
@@ -59,6 +64,7 @@ export class GraphEdge2 extends THREE.Points {
 
     // Interpolate the point's position along the line
     let currentPositions = this.geometry.getAttribute('position').array;
+
     for (let i = 0; i < this.points.length; i++) {
       let initialPosition = (i + 1) / this.points.length;
       let newPosition = this.time + initialPosition;

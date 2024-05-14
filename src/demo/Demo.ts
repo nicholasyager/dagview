@@ -13,6 +13,8 @@ import createGraph, { Graph } from 'ngraph.graph';
 import { EventedType } from 'ngraph.events';
 import { GraphEdge, GraphEdge2 } from './GraphEdge';
 
+import * as d3 from 'd3';
+
 const MAX_ENERGY = 0.1;
 
 function generateInterpolator(
@@ -114,22 +116,22 @@ export class Demo implements Experience {
       }
     }
 
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(10, 10),
-      new THREE.MeshStandardMaterial({ color: 0xffffff })
-    );
+    // const plane = new THREE.Mesh(
+    //   new THREE.PlaneGeometry(10, 10),
+    //   new THREE.MeshStandardMaterial({ color: 0xffffff })
+    // );
 
-    plane.rotation.x = -Math.PI / 2;
-    plane.receiveShadow = false;
+    // plane.rotation.x = -Math.PI / 2;
+    // plane.receiveShadow = false;
 
     // this.engine.scene.add(plane)
-    this.engine.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    // this.engine.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    let directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.castShadow = true;
-    directionalLight.position.set(2, 2, 2);
+    // let directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    // directionalLight.castShadow = true;
+    // directionalLight.position.set(2, 2, 2);
 
-    this.engine.scene.add(directionalLight);
+    // this.engine.scene.add(directionalLight);
 
     var directedBetweenness: { [key: string]: number } = centrality.betweenness(
       this.graph,
@@ -141,6 +143,7 @@ export class Demo implements Experience {
 
     console.log(maxBetweenness);
     const interpolator = generateInterpolator([0, maxBetweenness], [0.1, 1]);
+    let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
     this.graph.forEachNode((node) => {
       let position = this.layout.getNodePosition(node.id);
@@ -149,10 +152,13 @@ export class Demo implements Experience {
         return;
       }
 
+      let color = colorScale(node.data['schema']);
+
       let graphNode = new GraphNode(
         node.data.unique_id,
         node.data,
         interpolator(directedBetweenness[node.id]),
+        new THREE.Color(color),
         {
           betweenness: directedBetweenness[node.id],
         }
@@ -165,6 +171,7 @@ export class Demo implements Experience {
         position.y,
         position.z ? position.z : 0
       );
+
       this.nodes[node.data.unique_id] = graphNode;
       this.engine.scene.add(graphNode);
     });
@@ -172,9 +179,14 @@ export class Demo implements Experience {
     this.graph.forEachLink((link) => {
       let source = this.layout.getNodePosition(link.fromId);
       let target = this.layout.getNodePosition(link.toId);
+      let sourceNode = this.graph.getNode(link.fromId);
+
+      if (!sourceNode) return;
+
       let graphEdge = new GraphEdge2(
         new THREE.Vector3(source.x, source.y, source.z ? source.z : 0),
-        new THREE.Vector3(target.x, target.y, target.z ? target.z : 0)
+        new THREE.Vector3(target.x, target.y, target.z ? target.z : 0),
+        new THREE.Color(colorScale(sourceNode.data['schema']))
       );
       this.edges[link.id] = graphEdge;
       this.engine.scene.add(graphEdge);
