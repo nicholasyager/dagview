@@ -7,7 +7,10 @@ export class GraphEdge extends THREE.Line {
     const points = curve.getPoints(20)
     const geometry = new THREE.BufferGeometry().setFromPoints(points)
 
-    const material = new THREE.LineBasicMaterial({ color: 0xff0000 })
+    const material = new THREE.LineBasicMaterial({
+      color: 0xb3b3b3,
+      linewidth: 3,
+    })
 
     super(geometry, material)
   }

@@ -15,6 +15,7 @@ export class Raycaster extends EventEmitter {
       const x = (event.clientX / this.engine.sizes.width) * 2 - 1
       const y = -(event.clientY / this.engine.sizes.height) * 2 + 1
       this.setPointer(x, y)
+      this.update()
       if (this.listenerCount('move')) {
         this.emit('move', this.getIntersections())
       }
@@ -41,7 +42,11 @@ export class Raycaster extends EventEmitter {
   }
 
   public getIntersections() {
-    return this.raycaster.intersectObjects(this.engine.scene.children, true)
+    let intersections = this.raycaster.intersectObjects(
+      this.engine.scene.children,
+      true
+    )
+    return intersections
   }
 
   private mouseEventToVector2(event: MouseEvent) {

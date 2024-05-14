@@ -1,7 +1,7 @@
 import { WebGLRenderer } from 'three'
 import { Engine } from './Engine'
 import * as THREE from 'three'
-import { VRButton } from 'three/addons/webxr/VRButton.js'
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js'
 import { GameEntity } from './GameEntity'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass'
@@ -16,7 +16,6 @@ export class RenderEngine implements GameEntity {
       antialias: true,
     })
 
-    this.renderer.xr.enabled = true
     this.renderer.outputEncoding = THREE.sRGBEncoding
     this.renderer.toneMapping = THREE.CineonToneMapping
     this.renderer.toneMappingExposure = 1.75
@@ -35,6 +34,7 @@ export class RenderEngine implements GameEntity {
     this.composer.addPass(renderPass)
 
     document.body.appendChild(VRButton.createButton(this.renderer))
+    this.renderer.xr.enabled = true
   }
 
   update() {
@@ -42,8 +42,15 @@ export class RenderEngine implements GameEntity {
   }
 
   resize() {
-    this.renderer.setSize(this.engine.sizes.width, this.engine.sizes.height)
-    this.composer.setSize(this.engine.sizes.width, this.engine.sizes.height)
+    // Check if the VR device is presenting
+    const isVRPresenting = this.renderer.xr.isPresenting
+
+    // Change the size only if the VR device is not presenting
+    if (!isVRPresenting) {
+      this.renderer.setSize(this.engine.sizes.width, this.engine.sizes.height)
+      this.composer.setSize(this.engine.sizes.width, this.engine.sizes.height)
+    }
+
     this.composer.render()
   }
 }

@@ -8,9 +8,9 @@ export class GraphNode extends THREE.Mesh {
 
   constructor(uniqueId: string, nodeData: Object) {
     const geometry = new THREE.SphereGeometry(0.1)
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      emissive: 0xed7014,
     })
 
     super(geometry, material)

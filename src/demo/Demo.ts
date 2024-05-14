@@ -12,7 +12,7 @@ import createGraph, { Graph } from 'ngraph.graph'
 import { EventedType } from 'ngraph.events'
 import { GraphEdge } from './GraphEdge'
 
-const ITERATIONS_MAX = 100
+const MAX_ENERGY = 0.1
 
 export class Demo implements Experience {
   graph: Graph<any, any> & EventedType
@@ -25,7 +25,7 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.json',
+      path: 'assets/manifest.huge.json',
     },
   ]
 
@@ -34,7 +34,7 @@ export class Demo implements Experience {
     this.layout = createLayout(this.graph, {
       dimensions: 3,
       dragCoefficient: 0.99,
-      springLength: 5,
+      springLength: 0.11,
       gravity: -6,
     })
     this.nodes = {}
@@ -43,6 +43,8 @@ export class Demo implements Experience {
   }
 
   init() {
+    this.engine.raycaster.on('move', this.handlePointer)
+
     let manifest: Manifest = this.engine.resources.getItem('manifest')
 
     for (let [key, value] of Object.entries(manifest.nodes)) {
@@ -52,12 +54,20 @@ export class Demo implements Experience {
 
     for (let [source, targets] of Object.entries(manifest.child_map)) {
       if (source.startsWith('test')) continue
-      targets.forEach((target: string) => this.graph?.addLink(source, target))
+      if (!this.graph.hasNode(source)) continue
+
+      targets.forEach((target: string) => {
+        if (!this.graph.hasNode(target)) return
+        this.graph?.addLink(source, target)
+      })
     }
 
     for (let [target, sources] of Object.entries(manifest.parent_map)) {
       if (target.startsWith('test')) continue
-      sources.forEach((source: string) => this.graph?.addLink(source, target))
+      sources.forEach((source: string) => {
+        if (!this.graph.hasNode(source)) return
+        this.graph?.addLink(source, target)
+      })
     }
 
     // for (var i = 0; i < ITERATIONS_MAX; ++i) {
@@ -88,7 +98,7 @@ export class Demo implements Experience {
         // forcePercent: Math.abs(percentChange),
       })
 
-      if (Math.abs(meanForceDiff) < 5) {
+      if (Math.abs(meanForceDiff) < MAX_ENERGY) {
         break
       }
     }
@@ -144,6 +154,18 @@ export class Demo implements Experience {
   }
 
   resize() {}
+
+  handlePointer(intersections: Any) {
+    const selected = intersections.filter(
+      (element: Any) => element.object.type != 'Line'
+    )[0]
+    let element = document.getElementsByTagName('h1')[0]
+    if (!!selected && !!element) {
+      element.textContent = selected.object.nodeData.unique_id
+    } else {
+      element.textContent = ''
+    }
+  }
 
   update() {
     // if (this.iterations < ITERATIONS_MAX) this.layout.step()

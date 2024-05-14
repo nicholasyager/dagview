@@ -1,10 +1,10 @@
 {
-  "name": "threejs-ts-starter",
+  "name": "manifest_cloud",
   "version": "0.1.0",
-  "description": "Simple starter for Three.js projects with TypeScript",
+  "description": "A 3D dbt manifest viewer using threejs",
   "main": "index.html",
   "repository": "https://github.com/mayacoda/simple-threejs-typescript-starter",
-  "author": "Maya Nedeljković Batić",
+  "author": "Nicholas A. Yager",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

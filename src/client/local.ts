@@ -39,12 +39,10 @@ export class ManifestLoader {
   ): void {
     fetch(url)
       .then((response) => {
-        console.log('here')
         if (onProgress) onProgress({ url, loaded: 1, total: 1 })
         return response.json()
       })
       .then((manifest) => {
-        console.log(manifest)
         if (onLoad) onLoad(manifest)
         this.loadingManager.onLoad()
       })
