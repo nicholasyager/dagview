@@ -11,7 +11,7 @@ import centrality from 'ngraph.centrality';
 
 import createGraph, { Graph } from 'ngraph.graph';
 import { EventedType } from 'ngraph.events';
-import { GraphEdge } from './GraphEdge';
+import { GraphEdge, GraphEdge2 } from './GraphEdge';
 
 const MAX_ENERGY = 0.1;
 
@@ -29,7 +29,7 @@ export class Demo implements Experience {
   graph: Graph<any, any> & EventedType;
   layout: Layout<any>;
   nodes: { [key: string]: GraphNode };
-  edges: { [key: string]: GraphEdge };
+  edges: { [key: string]: GraphEdge2 };
   iterations: number;
 
   resources: Resource[] = [
@@ -172,7 +172,7 @@ export class Demo implements Experience {
     this.graph.forEachLink((link) => {
       let source = this.layout.getNodePosition(link.fromId);
       let target = this.layout.getNodePosition(link.toId);
-      let graphEdge = new GraphEdge(
+      let graphEdge = new GraphEdge2(
         new THREE.Vector3(source.x, source.y, source.z ? source.z : 0),
         new THREE.Vector3(target.x, target.y, target.z ? target.z : 0)
       );
@@ -187,7 +187,7 @@ export class Demo implements Experience {
 
   handlePointer(intersections: Any) {
     const selected = intersections.filter(
-      (element: Any) => element.object.type != 'Line'
+      (element: Any) => element.object.type == 'Mesh'
     )[0];
     let element = document.getElementsByTagName('h1')[0];
     if (!!selected && !!element) {
@@ -197,7 +197,10 @@ export class Demo implements Experience {
     }
   }
 
-  update() {
+  update(delta: number) {
+    Object.values(this.edges).forEach((edge) => {
+      edge.update(delta);
+    });
     // if (this.iterations < ITERATIONS_MAX) this.layout.step()
     // this.graph.forEachNode((node) => {
     //   let position = this.layout.getNodePosition(node.id)
