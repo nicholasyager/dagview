@@ -1,5 +1,5 @@
 {
-  "name": "manifest_cloud",
+  "name": "dagview",
   "version": "0.1.0",
   "description": "A 3D dbt manifest viewer using threejs",
   "main": "index.html",
