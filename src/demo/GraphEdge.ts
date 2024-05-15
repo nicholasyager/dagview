@@ -5,7 +5,7 @@ export class GraphEdge extends THREE.Line {
   constructor(source: THREE.Vector3, target: THREE.Vector3) {
     const curve = new THREE.CatmullRomCurve3([source, target]);
 
-    const points = curve.getPoints(20);
+    const points = curve.getPoints(10);
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
     const material = new THREE.LineBasicMaterial({
@@ -30,10 +30,10 @@ export class GraphEdge2 extends THREE.Points {
   ) {
     const curve = new THREE.CatmullRomCurve3([source, target]);
 
-    const particleCount = 20; // Adjust the number of particles as desired
+    const particleCount = source.distanceTo(target); // Adjust the number of particles as desired
     const points = curve.getSpacedPoints(particleCount);
 
-    const particleSize = 0.075; // Adjust the size of the particles
+    const particleSize = 0.05; // Adjust the size of the particles
     const particleColor = color; // Adjust the color of the particles
 
     // let sampledPoints = [];
@@ -59,7 +59,8 @@ export class GraphEdge2 extends THREE.Points {
 
   update(delta: number) {
     // Update the parameter t
-    this.time += 0.05 * delta;
+
+    this.time += 0.025 * delta;
     if (this.time > 1) this.time = 0; // Reset t to loop the animation
 
     // Interpolate the point's position along the line

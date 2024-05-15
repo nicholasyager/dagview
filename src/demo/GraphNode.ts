@@ -15,13 +15,15 @@ export class GraphNode extends THREE.Mesh {
     color: THREE.Color,
     statistics: GraphNodeStatistics
   ) {
-    console.log(nodeData);
-
     let geometry = undefined;
-    if (nodeData['resource_type'] == 'model') {
+    if (
+      nodeData['resource_type'] == 'model' ||
+      nodeData['resource_type'] == 'seed'
+    ) {
       geometry = new THREE.SphereGeometry(radius);
     } else {
       geometry = new THREE.ConeGeometry(radius, radius);
+      color = new THREE.Color(0xffffff);
     }
 
     const material = new THREE.MeshPhysicalMaterial({

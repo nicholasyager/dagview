@@ -39,6 +39,8 @@ export class Demo implements Experience {
       name: 'manifest',
       type: 'manifest',
       path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.big.json',
+      // path: 'assets/manifest.small.json',
     },
   ];
 
@@ -126,8 +128,7 @@ export class Demo implements Experience {
     );
     const maxBetweenness = Math.max(...Object.values(directedBetweenness));
 
-    console.log(maxBetweenness);
-    const interpolator = generateInterpolator([0, maxBetweenness], [0.1, 1]);
+    const interpolator = generateInterpolator([0, maxBetweenness], [0.1, 1.5]);
     let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
     this.graph.forEachNode((node) => {
@@ -137,7 +138,13 @@ export class Demo implements Experience {
         return;
       }
 
-      let color = colorScale(node.data['schema']);
+      node.data['owner'] = node.data['schema'];
+      let metadata = node.data['meta'];
+      if (metadata.hasOwnProperty('atlan')) {
+        node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
+      }
+
+      let color = colorScale(node.data['owner']);
 
       let graphNode = new GraphNode(
         node.data.unique_id,
@@ -171,7 +178,11 @@ export class Demo implements Experience {
       let graphEdge = new GraphEdge2(
         new THREE.Vector3(source.x, source.y, source.z ? source.z : 0),
         new THREE.Vector3(target.x, target.y, target.z ? target.z : 0),
-        new THREE.Color(colorScale(sourceNode.data['schema']))
+        new THREE.Color(
+          sourceNode.data['resource_type'] == 'source'
+            ? 'white'
+            : colorScale(sourceNode.data['owner'])
+        )
       );
       this.edges[link.id] = graphEdge;
       this.engine.scene.add(graphEdge);
