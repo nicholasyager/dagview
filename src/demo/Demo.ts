@@ -38,9 +38,9 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
-      // path: 'assets/manifest.small.json',
+      path: 'assets/manifest.small.json',
     },
   ];
 
@@ -187,8 +187,6 @@ export class Demo implements Experience {
       this.edges[link.id] = graphEdge;
       this.engine.scene.add(graphEdge);
     });
-
-    console.log('Fin');
   }
 
   resize() {}
