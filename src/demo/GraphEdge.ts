@@ -60,7 +60,7 @@ export class GraphEdge2 extends THREE.Points {
   update(delta: number) {
     // Update the parameter t
 
-    this.time += 0.025 * delta;
+    this.time += 0.05 * delta;
     if (this.time > 1) this.time = 0; // Reset t to loop the animation
 
     // Interpolate the point's position along the line
