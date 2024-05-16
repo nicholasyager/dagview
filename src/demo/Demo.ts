@@ -62,6 +62,7 @@ export class Demo implements Experience {
   init() {
     this.engine.raycaster.on('move', (e) => this.handlePointer(e));
     this.engine.raycaster.on('click', (e) => this.handleClick(e));
+    this.engine.raycaster.on('dblclick', (e) => this.handleDoubleClick(e));
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
 
@@ -242,7 +243,7 @@ export class Demo implements Experience {
         'target',
         selectedObject
       );
-      console.log(parentEdges);
+
       let edges = childEdges.concat(parentEdges);
 
       edges.forEach((edge) => {
@@ -250,6 +251,21 @@ export class Demo implements Experience {
         this.selectedNodes.push(edge.id);
       });
     }
+  }
+
+  handleDoubleClick(intersections: Any) {
+    const selected = intersections.filter(
+      (element: Any) => element.object.type == 'Mesh'
+    )[0];
+
+    if (!selected) {
+      return;
+    }
+    console.log(selected);
+
+    this.engine.camera.controls.target = new THREE.Vector3(
+      ...selected.object.position
+    );
   }
 
   update(delta: number) {
