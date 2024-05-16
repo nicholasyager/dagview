@@ -33,6 +33,7 @@ export class Demo implements Experience {
   nodes: { [key: string]: GraphNode };
   edges: { [key: string]: GraphEdge2 };
   iterations: number;
+  selectedNodes: string[];
 
   resources: Resource[] = [
     {
@@ -55,10 +56,12 @@ export class Demo implements Experience {
     this.nodes = {};
     this.edges = {};
     this.iterations = 0;
+    this.selectedNodes = [];
   }
 
   init() {
-    this.engine.raycaster.on('move', this.handlePointer);
+    this.engine.raycaster.on('move', (e) => this.handlePointer(e));
+    this.engine.raycaster.on('click', (e) => this.handleClick(e));
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
 
@@ -73,6 +76,7 @@ export class Demo implements Experience {
 
     for (let [source, targets] of Object.entries(manifest.child_map)) {
       if (source.startsWith('test')) continue;
+      if (source.startsWith('exposure')) continue;
       if (!this.graph.hasNode(source)) continue;
 
       targets.forEach((target: string) => {
@@ -83,6 +87,7 @@ export class Demo implements Experience {
 
     for (let [target, sources] of Object.entries(manifest.parent_map)) {
       if (target.startsWith('test')) continue;
+      if (target.startsWith('exposure')) continue;
       sources.forEach((source: string) => {
         if (!this.graph.hasNode(source)) return;
         this.graph?.addLink(source, target);
@@ -203,10 +208,37 @@ export class Demo implements Experience {
     }
   }
 
+  handleClick(intersections: Any) {
+    this.selectedNodes.forEach((node) => {
+      let selectedObject: GraphNode | undefined =
+        this.engine.scene.getObjectById(node) as GraphNode;
+      selectedObject.deselect();
+    });
+    this.selectedNodes = [];
+
+    const selected = intersections.filter(
+      (element: Any) => element.object.type == 'Mesh'
+    )[0];
+
+    if (!selected) {
+      return;
+    }
+
+    this.selectedNodes.push(selected.object.id);
+
+    let selectedObject: GraphNode | undefined = this.engine.scene.getObjectById(
+      selected.object.id
+    ) as GraphNode;
+    if (!!selectedObject) {
+      selectedObject.select();
+    }
+  }
+
   update(delta: number) {
     Object.values(this.edges).forEach((edge) => {
-      edge.update(delta);
+      edge.update(delta, this.engine);
     });
+
     // if (this.iterations < ITERATIONS_MAX) this.layout.step()
     // this.graph.forEachNode((node) => {
     //   let position = this.layout.getNodePosition(node.id)

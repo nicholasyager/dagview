@@ -8,6 +8,8 @@ export class GraphNode extends THREE.Mesh {
   uniqueId: string;
   nodeData: object;
 
+  selected: boolean;
+
   constructor(
     uniqueId: string,
     nodeData: Object,
@@ -29,14 +31,25 @@ export class GraphNode extends THREE.Mesh {
     const material = new THREE.MeshPhysicalMaterial({
       color: color.getHex(),
       emissive: color.getHex(),
-      emissiveIntensity: 0.25,
+      emissiveIntensity: 0.5,
     });
 
     super(geometry, material);
     this.castShadow = true; //default is false
     this.receiveShadow = true; //default
+    this.selected = false;
 
     this.uniqueId = uniqueId;
     this.nodeData = nodeData;
+  }
+
+  select() {
+    this.selected = true;
+    this.material.setValues({ emissiveIntensity: 1 });
+  }
+
+  deselect() {
+    this.selected = true;
+    this.material.setValues({ emissiveIntensity: 0.5 });
   }
 }
