@@ -170,19 +170,20 @@ export class Demo implements Experience {
       );
 
       this.nodes[node.data.unique_id] = graphNode;
+
       this.engine.scene.add(graphNode);
     });
 
     this.graph.forEachLink((link) => {
-      let source = this.layout.getNodePosition(link.fromId);
-      let target = this.layout.getNodePosition(link.toId);
       let sourceNode = this.graph.getNode(link.fromId);
+
+      let targetNode = this.graph.getNode(link.toId);
 
       if (!sourceNode) return;
 
       let graphEdge = new GraphEdge2(
-        new THREE.Vector3(source.x, source.y, source.z ? source.z : 0),
-        new THREE.Vector3(target.x, target.y, target.z ? target.z : 0),
+        this.engine.scene.getObjectByName(sourceNode.id as string),
+        this.engine.scene.getObjectByName(targetNode.id as string),
         new THREE.Color(
           sourceNode.data['resource_type'] == 'source'
             ? 'white'
@@ -231,6 +232,23 @@ export class Demo implements Experience {
     ) as GraphNode;
     if (!!selectedObject) {
       selectedObject.select();
+
+      // Find all edges and select those, too!
+      let childEdges = this.engine.scene.getObjectsByProperty(
+        'source',
+        selectedObject
+      );
+      let parentEdges = this.engine.scene.getObjectsByProperty(
+        'target',
+        selectedObject
+      );
+      console.log(parentEdges);
+      let edges = childEdges.concat(parentEdges);
+
+      edges.forEach((edge) => {
+        edge.select();
+        this.selectedNodes.push(edge.id);
+      });
     }
   }
 

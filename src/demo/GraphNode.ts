@@ -35,6 +35,7 @@ export class GraphNode extends THREE.Mesh {
     });
 
     super(geometry, material);
+    this.name = nodeData['unique_id'];
     this.castShadow = true; //default is false
     this.receiveShadow = true; //default
     this.selected = false;

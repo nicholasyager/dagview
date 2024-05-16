@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as d3 from 'd3';
 import { Engine } from '../engine/Engine';
+import { GraphNode } from './GraphNode';
 
 export class GraphEdge extends THREE.Line {
   constructor(source: THREE.Vector3, target: THREE.Vector3) {
@@ -19,19 +20,21 @@ export class GraphEdge extends THREE.Line {
 }
 
 export class GraphEdge2 extends THREE.Group {
+  source: GraphNode;
+  target: GraphNode;
+  selected: Boolean;
   points: THREE.Vector3[];
   curve: THREE.CatmullRomCurve3;
   // sampledPointIndices: number[];
   time: number;
 
-  constructor(
-    source: THREE.Vector3,
-    target: THREE.Vector3,
-    color: THREE.Color
-  ) {
-    const curve = new THREE.CatmullRomCurve3([source, target]);
+  constructor(source: GraphNode, target: GraphNode, color: THREE.Color) {
+    const curve = new THREE.CatmullRomCurve3([
+      source.position,
+      target.position,
+    ]);
 
-    const particleCount = source.distanceTo(target) / 5; // Adjust the number of particles as desired
+    const particleCount = source.position.distanceTo(target.position) / 5; // Adjust the number of particles as desired
     const points = curve.getSpacedPoints(particleCount);
 
     const particleSize = 0.075; // Adjust the size of the particles
@@ -74,6 +77,10 @@ export class GraphEdge2 extends THREE.Group {
     line.computeLineDistances();
     this.add(line);
 
+    this.selected = false;
+    this.source = source;
+    this.target = target;
+
     this.curve = curve;
     this.points = points;
 
@@ -93,13 +100,7 @@ export class GraphEdge2 extends THREE.Group {
     for (let i = 0; i < this.points.length; i++) {
       let initialPosition = (i + 1) / this.points.length;
       let newPosition = this.time + initialPosition;
-      // console.log({
-      //   i,
-      //   points: this.points.length,
-      //   initialPosition,
-      //   newPosition,
-      //   time: this.time,
-      // });
+
       if (newPosition >= 1) newPosition -= 1;
       // console.log({ time: this.time, initialPosition, newPosition });
       this.points[i] = this.curve.getPoint(newPosition);
@@ -121,7 +122,7 @@ export class GraphEdge2 extends THREE.Group {
 
     // Map the distance to an opacity value (for example, using linear mapping)
     // Adjust the mapping function as needed
-    const maxDistance = 50; // Maximum distance at which the mesh should be fully transparent
+    const maxDistance = 25; // Maximum distance at which the mesh should be fully transparent
     const minDistance = 5; // Minimum distance at which the mesh should be fully opaque
     const maxOpacity = 1.0; // Full opacity
     const minOpacity = 0.3; // Fully transparent
@@ -133,28 +134,28 @@ export class GraphEdge2 extends THREE.Group {
     );
 
     // Linearly interpolate opacity based on the distance
-    const opacity =
+    let opacity =
       minOpacity +
       ((maxOpacity - minOpacity) * (maxDistance - clampedDistance)) /
         (maxDistance - minDistance);
 
+    if (this.selected) {
+      opacity = 1;
+    }
+
     // Update the material opacity
     this.children[1].material.opacity = opacity;
 
-    // let currentPositions = this.geometry.getAttribute('position').array;
-
-    // for (let i = 0; i < this.sampledPointIndices.length; i++) {
-    //   let pointIndex = this.sampledPointIndices[i];
-    //   // Get the next point
-
-    //   if (pointIndex + 1 >= this.sampledPointIndices.length) pointIndex = -1;
-
-    //   let nextPoint = this.points[pointIndex + 1];
-    //   currentPositions[i] = nextPoint.x;
-    //   currentPositions[i + 1] = nextPoint.y;
-    //   currentPositions[i + 2] = nextPoint.z;
-    // }
-
     this.children[0].geometry.getAttribute('position').needsUpdate = true;
+  }
+
+  select() {
+    this.selected = true;
+    this.children[1].material.setValues({ gapSize: 2, dashSize: 1 });
+  }
+
+  deselect() {
+    this.selected = false;
+    this.children[1].material.setValues({ gapSize: 10, dashSize: 1 });
   }
 }
