@@ -11,9 +11,10 @@ import centrality from 'ngraph.centrality';
 
 import createGraph, { Graph } from 'ngraph.graph';
 import { EventedType } from 'ngraph.events';
-import { GraphEdge, GraphEdge2 } from './GraphEdge';
+import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
+import { RaycasterEvent } from '../engine/Raycaster';
 
 const MAX_ENERGY = 0.1;
 
@@ -33,7 +34,7 @@ export class Demo implements Experience {
   nodes: { [key: string]: GraphNode };
   edges: { [key: string]: GraphEdge2 };
   iterations: number;
-  selectedNodes: string[];
+  selectedNodes: number[];
 
   resources: Resource[] = [
     {
@@ -60,9 +61,15 @@ export class Demo implements Experience {
   }
 
   init() {
-    this.engine.raycaster.on('move', (e) => this.handlePointer(e));
-    this.engine.raycaster.on('click', (e) => this.handleClick(e));
-    this.engine.raycaster.on('dblclick', (e) => this.handleDoubleClick(e));
+    this.engine.raycaster.on('move', (e: RaycasterEvent[]) =>
+      this.handlePointer(e)
+    );
+    this.engine.raycaster.on('click', (e: RaycasterEvent[]) =>
+      this.handleClick(e)
+    );
+    this.engine.raycaster.on('dblclick', (e: RaycasterEvent[]) =>
+      this.handleDoubleClick(e)
+    );
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
 
@@ -144,7 +151,8 @@ export class Demo implements Experience {
         return;
       }
 
-      node.data['owner'] = node.data['schema'];
+      node.data['owner'] = undefined;
+      node.data['schema'];
       let metadata = node.data['meta'];
       if (metadata.hasOwnProperty('atlan')) {
         node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
@@ -177,14 +185,22 @@ export class Demo implements Experience {
 
     this.graph.forEachLink((link) => {
       let sourceNode = this.graph.getNode(link.fromId);
-
       let targetNode = this.graph.getNode(link.toId);
 
-      if (!sourceNode) return;
+      if (!sourceNode || !targetNode) return;
+
+      let sourceObject = this.engine.scene.getObjectByName(
+        sourceNode.id as string
+      );
+      let targetObject = this.engine.scene.getObjectByName(
+        targetNode.id as string
+      );
+
+      if (!sourceObject || !targetObject) return;
 
       let graphEdge = new GraphEdge2(
-        this.engine.scene.getObjectByName(sourceNode.id as string),
-        this.engine.scene.getObjectByName(targetNode.id as string),
+        sourceObject,
+        targetObject,
         new THREE.Color(
           sourceNode.data['resource_type'] == 'source'
             ? 'white'
@@ -198,19 +214,21 @@ export class Demo implements Experience {
 
   resize() {}
 
-  handlePointer(intersections: Any) {
+  handlePointer(intersections: RaycasterEvent[]) {
     const selected = intersections.filter(
-      (element: Any) => element.object.type == 'Mesh'
+      (element: RaycasterEvent) => element.object.type == 'Mesh'
     )[0];
+
     let element = document.getElementsByTagName('h1')[0];
     if (!!selected && !!element) {
-      element.textContent = selected.object.nodeData.unique_id;
+      let object = selected.object as GraphNode;
+      element.textContent = object.nodeData.unique_id;
     } else {
       element.textContent = '';
     }
   }
 
-  handleClick(intersections: Any) {
+  handleClick(intersections: RaycasterEvent[]) {
     this.selectedNodes.forEach((node) => {
       let selectedObject: GraphNode | undefined =
         this.engine.scene.getObjectById(node) as GraphNode;
@@ -219,7 +237,7 @@ export class Demo implements Experience {
     this.selectedNodes = [];
 
     const selected = intersections.filter(
-      (element: Any) => element.object.type == 'Mesh'
+      (element: RaycasterEvent) => element.object.type == 'Mesh'
     )[0];
 
     if (!selected) {
@@ -238,11 +256,11 @@ export class Demo implements Experience {
       let childEdges = this.engine.scene.getObjectsByProperty(
         'source',
         selectedObject
-      );
+      ) as GraphEdge2[];
       let parentEdges = this.engine.scene.getObjectsByProperty(
         'target',
         selectedObject
-      );
+      ) as GraphEdge2[];
 
       let edges = childEdges.concat(parentEdges);
 
@@ -253,9 +271,9 @@ export class Demo implements Experience {
     }
   }
 
-  handleDoubleClick(intersections: Any) {
+  handleDoubleClick(intersections: RaycasterEvent[]) {
     const selected = intersections.filter(
-      (element: Any) => element.object.type == 'Mesh'
+      (element: RaycasterEvent) => element.object.type == 'Mesh'
     )[0];
 
     if (!selected) {

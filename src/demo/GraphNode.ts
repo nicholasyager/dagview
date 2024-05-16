@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DbtNode } from '../client/local';
 
 export interface GraphNodeStatistics {
   betweenness: number;
@@ -6,22 +7,19 @@ export interface GraphNodeStatistics {
 
 export class GraphNode extends THREE.Mesh {
   uniqueId: string;
-  nodeData: object;
+  nodeData: DbtNode;
 
   selected: boolean;
 
   constructor(
     uniqueId: string,
-    nodeData: Object,
+    nodeData: DbtNode,
     radius: number,
     color: THREE.Color,
     statistics: GraphNodeStatistics
   ) {
     let geometry = undefined;
-    if (
-      nodeData['resource_type'] == 'model' ||
-      nodeData['resource_type'] == 'seed'
-    ) {
+    if (nodeData.resource_type == 'model' || nodeData.resource_type == 'seed') {
       geometry = new THREE.SphereGeometry(radius);
     } else {
       geometry = new THREE.ConeGeometry(radius, radius);
@@ -46,6 +44,7 @@ export class GraphNode extends THREE.Mesh {
 
   select() {
     this.selected = true;
+
     this.material.setValues({ emissiveIntensity: 1 });
   }
 

@@ -20,15 +20,19 @@ export class GraphEdge extends THREE.Line {
 }
 
 export class GraphEdge2 extends THREE.Group {
-  source: GraphNode;
-  target: GraphNode;
+  source: THREE.Object3D;
+  target: THREE.Object3D;
   selected: Boolean;
   points: THREE.Vector3[];
   curve: THREE.CatmullRomCurve3;
   // sampledPointIndices: number[];
   time: number;
 
-  constructor(source: GraphNode, target: GraphNode, color: THREE.Color) {
+  constructor(
+    source: THREE.Object3D,
+    target: THREE.Object3D,
+    color: THREE.Color
+  ) {
     const curve = new THREE.CatmullRomCurve3([
       source.position,
       target.position,

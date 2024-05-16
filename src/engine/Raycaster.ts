@@ -10,6 +10,10 @@ interface PointerState {
 
 const DRAG_THRESHOLD = 10;
 
+export type RaycasterEvent = THREE.Intersection<
+  THREE.Object3D<THREE.Object3DEventMap>
+>;
+
 export class Raycaster extends EventEmitter {
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
