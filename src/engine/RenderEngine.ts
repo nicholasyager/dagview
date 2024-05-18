@@ -5,6 +5,7 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { GameEntity } from './GameEntity';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 export class RenderEngine implements GameEntity {
   renderer: WebGLRenderer;
@@ -34,8 +35,19 @@ export class RenderEngine implements GameEntity {
     );
     this.composer.addPass(renderPass);
 
-    document.body.appendChild(VRButton.createButton(this.renderer));
-    this.renderer.xr.enabled = true;
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.5,
+      0.4,
+      0.85
+    );
+    bloomPass.threshold = this.engine.params.bloom.threshold;
+    bloomPass.strength = this.engine.params.bloom.strength;
+    bloomPass.radius = this.engine.params.bloom.radius;
+    this.composer.addPass(bloomPass);
+
+    // document.body.appendChild(VRButton.createButton(this.renderer));
+    // this.renderer.xr.enabled = true;
   }
 
   update() {
