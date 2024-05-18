@@ -28,6 +28,10 @@ export class GraphEdge2 extends THREE.Group {
   // sampledPointIndices: number[];
   time: number;
 
+  // Point properties
+  particleSize: number;
+  particleColor: THREE.Color;
+
   constructor(
     source: THREE.Object3D,
     target: THREE.Object3D,
@@ -38,11 +42,8 @@ export class GraphEdge2 extends THREE.Group {
       target.position,
     ]);
 
-    const particleCount = source.position.distanceTo(target.position) / 5; // Adjust the number of particles as desired
+    const particleCount = source.position.distanceTo(target.position); // Adjust the number of particles as desired
     const points = curve.getSpacedPoints(particleCount);
-
-    const particleSize = 0.075; // Adjust the size of the particles
-    const particleColor = color; // Adjust the color of the particles
 
     // let sampledPoints = [];
     // let sampledPointIndices = [];
@@ -52,30 +53,17 @@ export class GraphEdge2 extends THREE.Group {
     //   console.log(sampledPoints);
     // }
 
-    const material = new THREE.PointsMaterial({
-      size: particleSize,
-      color: particleColor,
-      transparent: true,
-      opacity: 0.5,
-    });
-
     super();
-    this.add(
-      new THREE.Points(
-        new THREE.BufferGeometry().setFromPoints(points),
-        material
-      )
-    );
 
     const line = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(curve.getPoints(20)),
       new THREE.LineDashedMaterial({
         color: color, //.lerp(new THREE.Color(0x000000), 0.75),
         scale: 10,
-        gapSize: 10,
+        gapSize: 0,
         dashSize: 1,
         transparent: true,
-        opacity: 1,
+        opacity: 0.075,
       })
     );
     line.computeLineDistances();
@@ -89,6 +77,9 @@ export class GraphEdge2 extends THREE.Group {
     this.points = points;
 
     this.time = 0;
+
+    this.particleSize = 0.075; // Adjust the size of the particles
+    this.particleColor = color; // Adjust the color of the particles
   }
 
   update(delta: number, engine: Engine) {
@@ -97,69 +88,104 @@ export class GraphEdge2 extends THREE.Group {
     this.time += 0.05 * delta;
     if (this.time > 1) this.time = 0; // Reset t to loop the animation
 
-    // Interpolate the point's position along the line
-    let currentPositions =
-      this.children[0].geometry.getAttribute('position').array;
-
-    for (let i = 0; i < this.points.length; i++) {
-      let initialPosition = (i + 1) / this.points.length;
-      let newPosition = this.time + initialPosition;
-
-      if (newPosition >= 1) newPosition -= 1;
-      // console.log({ time: this.time, initialPosition, newPosition });
-      this.points[i] = this.curve.getPoint(newPosition);
-
-      currentPositions[i * 3] = this.points[i].x;
-      currentPositions[i * 3 + 1] = this.points[i].y;
-      currentPositions[i * 3 + 2] = this.points[i].z;
-    }
-
     //Update the line's opacity
 
     // Calculate distance from mesh to camera
-    if (this.children.length <= 1) return;
+    if (this.children.length < 1) return;
 
     const position = new THREE.Vector3(
-      ...this.children[1].geometry.getAttribute('position').array
+      ...this.children[0].geometry.getAttribute('position').array
     );
     const distance = position.distanceTo(engine.camera.instance.position);
 
     // Map the distance to an opacity value (for example, using linear mapping)
     // Adjust the mapping function as needed
-    const maxDistance = 25; // Maximum distance at which the mesh should be fully transparent
-    const minDistance = 5; // Minimum distance at which the mesh should be fully opaque
-    const maxOpacity = 1.0; // Full opacity
-    const minOpacity = 0.3; // Fully transparent
+    const maxPointDistance = 25; // Maximum distance at which the mesh should be fully transparent
+    const minPointDistance = 5; // Minimum distance at which the mesh should be fully opaque
+    const maxLineDistance = 50; // Maximum distance at which the mesh should be fully transparent
+    const minLineDistance = 5; // Minimum distance at which the mesh should be fully opaque
+    const maxOpacity = 0.75; // Full opacity
+    const maxLineOpacity = 0.2; // Full opacity
+    const minOpacity = 0.05; // Fully transparent
+
+    const clampedLineDistance = Math.min(
+      Math.max(distance, minLineDistance),
+      maxLineDistance
+    );
+    let lineOpacity =
+      maxLineOpacity -
+      minOpacity +
+      ((maxLineOpacity - minOpacity) *
+        (maxLineDistance - clampedLineDistance)) /
+        (maxLineDistance - minLineDistance);
+
+    if (this.selected) {
+      lineOpacity = 1;
+    }
+
+    this.children[0].material.opacity = lineOpacity;
 
     // Ensure distance is within bounds
-    const clampedDistance = Math.min(
-      Math.max(distance, minDistance),
-      maxDistance
+    const clampedPointDistance = Math.min(
+      Math.max(distance, minPointDistance),
+      maxPointDistance
     );
 
     // Linearly interpolate opacity based on the distance
-    let opacity =
+    let pointOpacity =
       minOpacity +
-      ((maxOpacity - minOpacity) * (maxDistance - clampedDistance)) /
-        (maxDistance - minDistance);
+      ((maxOpacity - minOpacity) * (maxPointDistance - clampedPointDistance)) /
+        (maxPointDistance - minPointDistance);
 
     if (this.selected) {
-      opacity = 1;
+      pointOpacity = 1;
     }
 
     // Update the material opacity
-    this.children[1].material.opacity = opacity;
 
-    this.children[0].geometry.getAttribute('position').needsUpdate = true;
+    if (this.selected && this.children.length >= 2) {
+      this.children[1].material.opacity = pointOpacity;
+      // Interpolate the point's position along the line
+      let currentPositions =
+        this.children[1].geometry.getAttribute('position').array;
+
+      for (let i = 0; i < this.points.length; i++) {
+        let initialPosition = (i + 1) / this.points.length;
+        let newPosition = this.time + initialPosition;
+
+        if (newPosition >= 1) newPosition -= 1;
+        // console.log({ time: this.time, initialPosition, newPosition });
+        this.points[i] = this.curve.getPoint(newPosition);
+
+        currentPositions[i * 3] = this.points[i].x;
+        currentPositions[i * 3 + 1] = this.points[i].y;
+        currentPositions[i * 3 + 2] = this.points[i].z;
+      }
+      this.children[1].geometry.getAttribute('position').needsUpdate = true;
+    }
   }
 
   select() {
     this.selected = true;
-    this.children[1].material.setValues({ gapSize: 2, dashSize: 1 });
+    this.children[0].material.setValues({ gapSize: 2, dashSize: 1 });
+
+    this.add(
+      new THREE.Points(
+        new THREE.BufferGeometry().setFromPoints(this.points),
+        new THREE.PointsMaterial({
+          size: this.particleSize,
+          color: this.particleColor,
+          transparent: true,
+          opacity: 0.5,
+        })
+      )
+    );
   }
 
   deselect() {
     this.selected = false;
-    this.children[1].material.setValues({ gapSize: 10, dashSize: 1 });
+    this.children[0].material.setValues({ gapSize: 0, dashSize: 1 });
+
+    this.remove(this.children[1]);
   }
 }

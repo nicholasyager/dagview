@@ -40,9 +40,9 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      // path: 'assets/manifest.huge.json',
+      path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
-      path: 'assets/manifest.small.json',
+      // path: 'assets/manifest.small.json',
     },
   ];
 
