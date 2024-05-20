@@ -5,6 +5,8 @@ export interface GraphNodeStatistics {
   betweenness: number;
 }
 
+const MIN_EMISSIVITY = 0.5;
+
 export class GraphNode extends THREE.Mesh {
   uniqueId: string;
   nodeData: DbtNode;
@@ -29,7 +31,7 @@ export class GraphNode extends THREE.Mesh {
     const material = new THREE.MeshPhysicalMaterial({
       color: color.getHex(),
       emissive: color.getHex(),
-      emissiveIntensity: 0.5,
+      emissiveIntensity: MIN_EMISSIVITY,
     });
 
     super(geometry, material);
@@ -50,6 +52,6 @@ export class GraphNode extends THREE.Mesh {
 
   deselect() {
     this.selected = true;
-    this.material.setValues({ emissiveIntensity: 0.5 });
+    this.material.setValues({ emissiveIntensity: MIN_EMISSIVITY });
   }
 }

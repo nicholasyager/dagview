@@ -7,6 +7,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
+const BLOOM_SCENE = 1;
+
 export class RenderEngine implements GameEntity {
   renderer: WebGLRenderer;
   composer: EffectComposer;
@@ -34,6 +36,9 @@ export class RenderEngine implements GameEntity {
       this.engine.camera.instance
     );
     this.composer.addPass(renderPass);
+
+    const bloomLayer = new THREE.Layers();
+    bloomLayer.set(BLOOM_SCENE);
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),

@@ -17,11 +17,24 @@ export type RaycasterEvent = THREE.Intersection<
 export class Raycaster extends EventEmitter {
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
+  private cameraViewProjectionMatrix: THREE.Matrix4;
+  private frustum: THREE.Frustum;
 
   constructor(private engine: Engine) {
     super();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
+
+    this.cameraViewProjectionMatrix = new THREE.Matrix4();
+    this.cameraViewProjectionMatrix.multiplyMatrices(
+      this.engine.camera.instance.projectionMatrix,
+      this.engine.camera.instance.matrixWorldInverse
+    );
+
+    // Set the frustum from the camera's view projection matrix
+    // Create a frustum
+    this.frustum = new THREE.Frustum();
+    this.frustum.setFromProjectionMatrix(this.cameraViewProjectionMatrix);
 
     const pointerState: PointerState = {
       isDragging: false,
@@ -52,11 +65,21 @@ export class Raycaster extends EventEmitter {
       }
     });
 
+    document.addEventListener('wheel', (event: WheelEvent) => {
+      if (!(event.target instanceof HTMLCanvasElement)) return;
+      if (this.listenerCount('cameraMove')) {
+        this.emit('cameraMove', this);
+      }
+    });
+
     document.addEventListener('mouseup', (event: MouseEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
 
       if (pointerState.isDragging) {
         console.log('Drag event detected');
+        if (this.listenerCount('cameraMove')) {
+          this.emit('cameraMove', this);
+        }
       } else {
         const point = this.mouseEventToVector2(event);
         this.setPointer(point.x, point.y);
@@ -97,6 +120,11 @@ export class Raycaster extends EventEmitter {
       true
     );
     return intersections;
+  }
+
+  public isSeen(object: THREE.Object3D) {
+    // Check if the object's bounding box is within the frustum
+    return this.frustum.intersectsObject(object);
   }
 
   private mouseEventToVector2(event: MouseEvent) {

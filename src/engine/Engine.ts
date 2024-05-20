@@ -52,10 +52,10 @@ export class Engine {
 
     this.params = {
       bloom: {
-        threshold: 0,
-        strength: 1,
+        threshold: 0, //0.15,
+        strength: 2,
         radius: 0.5,
-        exposure: 1,
+        exposure: 2,
       },
     };
 
@@ -81,6 +81,21 @@ export class Engine {
     this.resources.on('progress', (progress: number) => {
       this.loader.setProgress(progress);
     });
+
+    const bloomFolder = this.debug.gui.addFolder('Bloom');
+    bloomFolder
+      .add(this.params.bloom, 'strength', 0.0, 10.0)
+      .onChange((value) => {
+        this.renderEngine.composer.passes[1].strength = Number(value);
+        this.time.update();
+      });
+
+    bloomFolder
+      .add(this.params.bloom, 'radius', 0.0, 10.0)
+      .onChange((value) => {
+        this.renderEngine.composer.passes[1].radius = Number(value);
+        this.time.update();
+      });
   }
 
   update(delta: number) {

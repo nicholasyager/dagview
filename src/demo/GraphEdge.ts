@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as d3 from 'd3';
 import { Engine } from '../engine/Engine';
-import { GraphNode } from './GraphNode';
+import { Raycaster } from '../engine/Raycaster';
 
 export class GraphEdge extends THREE.Line {
   constructor(source: THREE.Vector3, target: THREE.Vector3) {
@@ -31,6 +31,7 @@ export class GraphEdge2 extends THREE.Group {
   // Point properties
   particleSize: number;
   particleColor: THREE.Color;
+  endpointVisible: boolean;
 
   constructor(
     source: THREE.Object3D,
@@ -54,11 +55,12 @@ export class GraphEdge2 extends THREE.Group {
     // }
 
     super();
+    this.endpointVisible = true;
 
     const line = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(curve.getPoints(20)),
       new THREE.LineDashedMaterial({
-        color: color, //.lerp(new THREE.Color(0x000000), 0.75),
+        color: color.lerp(new THREE.Color(0x000000), 0.8),
         scale: 10,
         gapSize: 0,
         dashSize: 1,
@@ -82,6 +84,12 @@ export class GraphEdge2 extends THREE.Group {
     this.particleColor = color; // Adjust the color of the particles
   }
 
+  handleCameraMove(raycaster: Raycaster) {
+    // Confirm if the edge should be viewable.
+    this.endpointVisible =
+      raycaster.isSeen(this.source) || raycaster.isSeen(this.target);
+  }
+
   update(delta: number, engine: Engine) {
     // Update the parameter t
 
@@ -102,25 +110,39 @@ export class GraphEdge2 extends THREE.Group {
     // Adjust the mapping function as needed
     const maxPointDistance = 25; // Maximum distance at which the mesh should be fully transparent
     const minPointDistance = 5; // Minimum distance at which the mesh should be fully opaque
-    const maxLineDistance = 50; // Maximum distance at which the mesh should be fully transparent
-    const minLineDistance = 5; // Minimum distance at which the mesh should be fully opaque
-    const maxOpacity = 0.75; // Full opacity
-    const maxLineOpacity = 0.2; // Full opacity
+    const maxOpacity = 1; // Full opacity
+
     const minOpacity = 0.05; // Fully transparent
 
-    const clampedLineDistance = Math.min(
-      Math.max(distance, minLineDistance),
-      maxLineDistance
+    const minLineOpacity = 0.15;
+    const maxLineOpacity = 0.5;
+
+    let lineOpacity = this.calculateLineOpacity(
+      distance,
+      [
+        [0, 5],
+        [5, 10],
+        [10, 20],
+        [20, 50],
+        [50, 10000],
+        [10000, 100000],
+      ],
+      [
+        [minLineOpacity, minLineOpacity],
+        [maxLineOpacity, minLineOpacity],
+        [maxLineOpacity, maxLineOpacity],
+        [minLineOpacity, maxLineOpacity],
+        [minLineOpacity, minLineOpacity],
+        [minLineOpacity, 0.0],
+      ]
     );
-    let lineOpacity =
-      maxLineOpacity -
-      minOpacity +
-      ((maxLineOpacity - minOpacity) *
-        (maxLineDistance - clampedLineDistance)) /
-        (maxLineDistance - minLineDistance);
 
     if (this.selected) {
       lineOpacity = 1;
+    }
+
+    if (!this.endpointVisible) {
+      lineOpacity = minLineOpacity;
     }
 
     this.children[0].material.opacity = lineOpacity;
@@ -187,5 +209,38 @@ export class GraphEdge2 extends THREE.Group {
     this.children[0].material.setValues({ gapSize: 0, dashSize: 1 });
 
     this.remove(this.children[1]);
+  }
+
+  calculateLineOpacity(
+    distance: number,
+    distanceRanges: [number, number][],
+    opacityRanges: [number, number][]
+  ): number {
+    // For a given distance, and ranges of opacities, calculate the appropriate opacity.
+
+    for (let rangeIndex = 0; rangeIndex < distanceRanges.length; rangeIndex++) {
+      const distanceRange = distanceRanges[rangeIndex];
+      const opacityRange = opacityRanges[rangeIndex];
+      if (!(distance >= distanceRange[0] && distance < distanceRange[1])) {
+        continue;
+      }
+
+      const clampedLineDistance = Math.min(
+        Math.max(distance, distanceRange[0]),
+        distanceRange[1]
+      );
+
+      let output =
+        opacityRange[0] +
+        ((opacityRange[1] - opacityRange[0]) *
+          (distanceRange[1] - clampedLineDistance)) /
+          (distanceRange[1] - distanceRange[0]);
+
+      // if (rangeIndex >= 1 && rangeIndex <= 3)
+      // console.log(distance, distanceRange, opacityRange, output);
+      return output;
+    }
+
+    return 1;
   }
 }

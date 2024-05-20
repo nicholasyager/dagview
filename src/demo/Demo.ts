@@ -41,8 +41,8 @@ export class Demo implements Experience {
       name: 'manifest',
       type: 'manifest',
       // path: 'assets/manifest.huge.json',
-      // path: 'assets/manifest.big.json',
-      path: 'assets/manifest.small.json',
+      path: 'assets/manifest.big.json',
+      // path: 'assets/manifest.small.json',
     },
   ];
 
@@ -69,6 +69,10 @@ export class Demo implements Experience {
     );
     this.engine.raycaster.on('dblclick', (e: RaycasterEvent[]) =>
       this.handleDoubleClick(e)
+    );
+
+    this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) =>
+      this.handleCameraMove(e)
     );
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
@@ -203,7 +207,7 @@ export class Demo implements Experience {
         targetObject,
         new THREE.Color(
           sourceNode.data['resource_type'] == 'source'
-            ? 'white'
+            ? 0xaaaaaa
             : colorScale(sourceNode.data['owner'])
         )
       );
