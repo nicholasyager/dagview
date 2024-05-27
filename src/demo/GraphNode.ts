@@ -12,6 +12,7 @@ export class GraphNode extends THREE.Mesh {
   nodeData: DbtNode;
 
   selected: boolean;
+  dimmed: boolean;
 
   constructor(
     uniqueId: string,
@@ -43,6 +44,7 @@ export class GraphNode extends THREE.Mesh {
     this.castShadow = true; //default is false
     this.receiveShadow = true; //default
     this.selected = false;
+    this.dimmed = false;
 
     this.uniqueId = uniqueId;
     this.nodeData = nodeData;
@@ -55,7 +57,17 @@ export class GraphNode extends THREE.Mesh {
   }
 
   deselect() {
-    this.selected = true;
+    this.selected = false;
+    this.material.setValues({ emissiveIntensity: MIN_EMISSIVITY });
+  }
+
+  dim() {
+    this.dimmed = true;
+    this.material.setValues({ emissiveIntensity: 0.05 });
+  }
+
+  dedim() {
+    this.dimmed = false;
     this.material.setValues({ emissiveIntensity: MIN_EMISSIVITY });
   }
 }

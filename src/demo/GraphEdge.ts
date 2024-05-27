@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as d3 from 'd3';
 import { Engine } from '../engine/Engine';
 import { Raycaster } from '../engine/Raycaster';
+import { GraphNode } from './GraphNode';
 
 export class GraphEdge extends THREE.Line {
   constructor(source: THREE.Vector3, target: THREE.Vector3) {
@@ -30,8 +31,8 @@ function findIndexOfRange(arr: [number, number][], num: number): number {
 }
 
 export class GraphEdge2 extends THREE.Group {
-  source: THREE.Object3D;
-  target: THREE.Object3D;
+  source: GraphNode;
+  target: GraphNode;
   selected: Boolean;
   dimmed: Boolean;
   points: THREE.Vector3[];
@@ -46,8 +47,8 @@ export class GraphEdge2 extends THREE.Group {
 
   constructor(
     name: string,
-    source: THREE.Object3D,
-    target: THREE.Object3D,
+    source: GraphNode,
+    target: GraphNode,
     color: THREE.Color
   ) {
     // console.log(color);

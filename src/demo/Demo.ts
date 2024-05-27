@@ -40,8 +40,8 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.huge.json',
-      // path: 'assets/manifest.big.json',
+      // path: 'assets/manifest.huge.json',
+      path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
   ];
@@ -182,7 +182,7 @@ export class Demo implements Experience {
         position.z ? position.z : 0
       );
 
-      this.nodes[node.data.unique_id] = graphNode;
+      this.nodes[node.id] = graphNode;
 
       this.engine.scene.add(graphNode);
     });
@@ -193,12 +193,8 @@ export class Demo implements Experience {
 
       if (!sourceNode || !targetNode) return;
 
-      let sourceObject = this.engine.scene.getObjectByName(
-        sourceNode.id as string
-      );
-      let targetObject = this.engine.scene.getObjectByName(
-        targetNode.id as string
-      );
+      let sourceObject = this.nodes[sourceNode.id];
+      let targetObject = this.nodes[targetNode.id];
 
       if (!sourceObject || !targetObject) return;
 
@@ -244,6 +240,10 @@ export class Demo implements Experience {
       edge.dedim();
     });
 
+    Object.values(this.nodes).forEach((node) => {
+      node.dedim();
+    });
+
     this.selectedNodes = [];
 
     const selected = intersections.filter(
@@ -258,6 +258,10 @@ export class Demo implements Experience {
 
     Object.values(this.edges).forEach((edge) => {
       edge.dim();
+    });
+
+    Object.values(this.nodes).forEach((node) => {
+      node.dim();
     });
 
     let selectedObject: GraphNode | undefined = this.engine.scene.getObjectById(
@@ -281,6 +285,10 @@ export class Demo implements Experience {
       edges.forEach((edge) => {
         edge.select();
         edge.dedim();
+
+        edge.source.dedim();
+        edge.target.dedim();
+
         this.selectedNodes.push(edge.id);
       });
     }
