@@ -40,8 +40,8 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      // path: 'assets/manifest.huge.json',
-      path: 'assets/manifest.big.json',
+      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
   ];
@@ -50,7 +50,7 @@ export class Demo implements Experience {
     this.graph = createGraph();
     this.layout = createLayout(this.graph, {
       dimensions: 3,
-      dragCoefficient: 0.99,
+      // dragCoefficient: 0.99,
       springLength: 0.05,
       gravity: -6,
     });
@@ -71,9 +71,7 @@ export class Demo implements Experience {
       this.handleDoubleClick(e)
     );
 
-    this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) =>
-      this.handleCameraMove(e)
-    );
+    this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) => {});
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
 
@@ -146,6 +144,8 @@ export class Demo implements Experience {
     const maxBetweenness = Math.max(...Object.values(directedBetweenness));
 
     const interpolator = generateInterpolator([0, maxBetweenness], [0.1, 1.5]);
+
+    // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
     let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
     this.graph.forEachNode((node) => {
@@ -203,6 +203,7 @@ export class Demo implements Experience {
       if (!sourceObject || !targetObject) return;
 
       let graphEdge = new GraphEdge2(
+        link.id,
         sourceObject,
         targetObject,
         new THREE.Color(
@@ -238,6 +239,11 @@ export class Demo implements Experience {
         this.engine.scene.getObjectById(node) as GraphNode;
       selectedObject.deselect();
     });
+
+    Object.values(this.edges).forEach((edge) => {
+      edge.dedim();
+    });
+
     this.selectedNodes = [];
 
     const selected = intersections.filter(
@@ -249,6 +255,10 @@ export class Demo implements Experience {
     }
 
     this.selectedNodes.push(selected.object.id);
+
+    Object.values(this.edges).forEach((edge) => {
+      edge.dim();
+    });
 
     let selectedObject: GraphNode | undefined = this.engine.scene.getObjectById(
       selected.object.id
@@ -270,6 +280,7 @@ export class Demo implements Experience {
 
       edges.forEach((edge) => {
         edge.select();
+        edge.dedim();
         this.selectedNodes.push(edge.id);
       });
     }

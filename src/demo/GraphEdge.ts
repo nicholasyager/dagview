@@ -19,10 +19,21 @@ export class GraphEdge extends THREE.Line {
   }
 }
 
+function findIndexOfRange(arr: [number, number][], num: number): number {
+  for (let i = 0; i < arr.length; i++) {
+    const [min, max] = arr[i];
+    if (num >= min && num <= max) {
+      return i;
+    }
+  }
+  return -1; // If the number is not within any range
+}
+
 export class GraphEdge2 extends THREE.Group {
   source: THREE.Object3D;
   target: THREE.Object3D;
   selected: Boolean;
+  dimmed: Boolean;
   points: THREE.Vector3[];
   curve: THREE.CatmullRomCurve3;
   // sampledPointIndices: number[];
@@ -34,10 +45,12 @@ export class GraphEdge2 extends THREE.Group {
   endpointVisible: boolean;
 
   constructor(
+    name: string,
     source: THREE.Object3D,
     target: THREE.Object3D,
     color: THREE.Color
   ) {
+    // console.log(color);
     const curve = new THREE.CatmullRomCurve3([
       source.position,
       target.position,
@@ -55,6 +68,7 @@ export class GraphEdge2 extends THREE.Group {
     // }
 
     super();
+    this.name = name;
     this.endpointVisible = true;
 
     const line = new THREE.Line(
@@ -72,6 +86,7 @@ export class GraphEdge2 extends THREE.Group {
     this.add(line);
 
     this.selected = false;
+    this.dimmed = false;
     this.source = source;
     this.target = target;
 
@@ -106,6 +121,21 @@ export class GraphEdge2 extends THREE.Group {
     );
     const distance = position.distanceTo(engine.camera.instance.position);
 
+    let distanceColorScale = d3.scaleSequential([0, 5], d3.interpolatePuOr);
+
+    const distanceArrays: [number, number][] = [
+      [0, 5],
+      [5, 10],
+      [10, 30],
+      [30, 75],
+      [75, 500],
+      [500, 1000],
+    ];
+
+    // this.children[0].material.color = new THREE.Color(
+    //   distanceColorScale(findIndexOfRange(distanceArrays, distance))
+    // );
+
     // Map the distance to an opacity value (for example, using linear mapping)
     // Adjust the mapping function as needed
     const maxPointDistance = 25; // Maximum distance at which the mesh should be fully transparent
@@ -114,31 +144,24 @@ export class GraphEdge2 extends THREE.Group {
 
     const minOpacity = 0.05; // Fully transparent
 
-    const minLineOpacity = 0.15;
+    const minLineOpacity = 0.1;
     const maxLineOpacity = 0.5;
 
-    let lineOpacity = this.calculateLineOpacity(
-      distance,
-      [
-        [0, 5],
-        [5, 10],
-        [10, 20],
-        [20, 50],
-        [50, 10000],
-        [10000, 100000],
-      ],
-      [
-        [minLineOpacity, minLineOpacity],
-        [maxLineOpacity, minLineOpacity],
-        [maxLineOpacity, maxLineOpacity],
-        [minLineOpacity, maxLineOpacity],
-        [minLineOpacity, minLineOpacity],
-        [minLineOpacity, 0.0],
-      ]
-    );
+    let lineOpacity = this.calculateLineOpacity(distance, distanceArrays, [
+      [minLineOpacity, minLineOpacity],
+      [maxLineOpacity, minLineOpacity],
+      [maxLineOpacity, maxLineOpacity],
+      [minLineOpacity, maxLineOpacity],
+      [minLineOpacity, minLineOpacity],
+      [minLineOpacity, 0.0],
+    ]);
 
     if (this.selected) {
       lineOpacity = 1;
+    }
+
+    if (this.dimmed) {
+      lineOpacity = lineOpacity / 2;
     }
 
     if (!this.endpointVisible) {
@@ -202,6 +225,14 @@ export class GraphEdge2 extends THREE.Group {
         })
       )
     );
+  }
+
+  dim() {
+    this.dimmed = true;
+  }
+
+  dedim() {
+    this.dimmed = false;
   }
 
   deselect() {

@@ -21,7 +21,11 @@ export class GraphNode extends THREE.Mesh {
     statistics: GraphNodeStatistics
   ) {
     let geometry = undefined;
-    if (nodeData.resource_type == 'model' || nodeData.resource_type == 'seed') {
+    if (
+      nodeData.resource_type == 'model' ||
+      nodeData.resource_type == 'seed' ||
+      nodeData.resource_type == 'snapshot'
+    ) {
       geometry = new THREE.SphereGeometry(radius);
     } else {
       geometry = new THREE.ConeGeometry(radius, radius);
