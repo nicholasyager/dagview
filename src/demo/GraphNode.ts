@@ -3,6 +3,7 @@ import { DbtNode } from '../client/local';
 
 export interface GraphNodeStatistics {
   betweenness: number;
+  degree: number;
 }
 
 const MIN_EMISSIVITY = 0.5;

@@ -1131,6 +1131,32 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dagview@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "dagview@workspace:."
+  dependencies:
+    "@types/d3": ^7.4.3
+    "@types/three": ^0.156.0
+    "@vitejs/plugin-basic-ssl": ^1.1.0
+    d3: ^7.9.0
+    d3-interpolate: ^3.0.1
+    d3-scale-chromatic: ^3.1.0
+    husky: ^8.0.3
+    lil-gui: ^0.18.2
+    lint-staged: ^13.3.0
+    ngraph.centrality: ^2.1.0
+    ngraph.forcelayout: ^3.3.1
+    ngraph.graph: ^20.0.1
+    ngraph.pagerank: ^2.1.1
+    prettier: 2.8.8
+    sass: ^1.69.0
+    three: ^0.157.0
+    typescript: ^5.2.2
+    vite: ^4.4.11
+    vite-plugin-glsl: ^1.1.2
+  languageName: unknown
+  linkType: soft
+
 "debug@npm:4, debug@npm:4.3.4, debug@npm:^4.1.0, debug@npm:^4.3.3":
   version: 4.3.4
   resolution: "debug@npm:4.3.4"
@@ -1163,6 +1189,13 @@ __metadata:
   version: 1.1.2
   resolution: "depd@npm:1.1.2"
   checksum: 6b406620d269619852885ce15965272b829df6f409724415e0002c8632ab6a8c0a08ec1f0bd2add05dc7bd7507606f7e2cc034fa24224ab829580040b835ecd9
+  languageName: node
+  linkType: hard
+
+"dotparser@npm:^1.0.0":
+  version: 1.1.1
+  resolution: "dotparser@npm:1.1.1"
+  checksum: 94658e29a293154062b36dbc1d4b4f5c95ab82a52d682a00b066c55c4dcaccccdc45430f753b5a8115247f3677fcb448f85a803239fca90a00c05c8cf390c4ef
   languageName: node
   linkType: hard
 
@@ -1736,31 +1769,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"manifest_cloud@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "manifest_cloud@workspace:."
-  dependencies:
-    "@types/d3": ^7.4.3
-    "@types/three": ^0.156.0
-    "@vitejs/plugin-basic-ssl": ^1.1.0
-    d3: ^7.9.0
-    d3-interpolate: ^3.0.1
-    d3-scale-chromatic: ^3.1.0
-    husky: ^8.0.3
-    lil-gui: ^0.18.2
-    lint-staged: ^13.3.0
-    ngraph.centrality: ^2.1.0
-    ngraph.forcelayout: ^3.3.1
-    ngraph.graph: ^20.0.1
-    prettier: 2.8.8
-    sass: ^1.69.0
-    three: ^0.157.0
-    typescript: ^5.2.2
-    vite: ^4.4.11
-    vite-plugin-glsl: ^1.1.2
-  languageName: unknown
-  linkType: soft
-
 "merge-stream@npm:^2.0.0":
   version: 2.0.0
   resolution: "merge-stream@npm:2.0.0"
@@ -1951,7 +1959,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ngraph.graph@npm:^20.0.1":
+"ngraph.fromdot@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "ngraph.fromdot@npm:7.0.0"
+  dependencies:
+    dotparser: ^1.0.0
+    ngraph.graph: ^20.0.0
+  checksum: 9b14ed812b89bad17d94e08a307d9bdaaf615eb9b7b143d83233366f3f6dc5bfff23c319ab3567c5c58d0d73ec27932a7c25e92f6977c5b415dfc16b5cc8e2d6
+  languageName: node
+  linkType: hard
+
+"ngraph.graph@npm:^20.0.0, ngraph.graph@npm:^20.0.1":
   version: 20.0.1
   resolution: "ngraph.graph@npm:20.0.1"
   dependencies:
@@ -1964,6 +1982,17 @@ __metadata:
   version: 1.0.0
   resolution: "ngraph.merge@npm:1.0.0"
   checksum: e4ad9e55acec7704229f56e7d6157b17a9d87736efdbd2cee6c3fab92cffb99e94b3d8e2e5e75f863f4fe972192a2bff1381e58334115d7c9c08b55b1673801f
+  languageName: node
+  linkType: hard
+
+"ngraph.pagerank@npm:^2.1.1":
+  version: 2.1.1
+  resolution: "ngraph.pagerank@npm:2.1.1"
+  dependencies:
+    ngraph.fromdot: ^7.0.0
+  bin:
+    pagrank: bin/pagerank.js
+  checksum: c7c04bd063bcd1d2abb674340ef300329300bb57226888eed940954e6044b657d8376a3d6879fab80e934ba97ad2a468e058be7adb13a481e70add7508803d21
   languageName: node
   linkType: hard
 

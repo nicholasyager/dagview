@@ -8,6 +8,7 @@ import { GraphNode } from './GraphNode';
 
 import createLayout, { Layout } from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
+import pageRank from 'ngraph.pagerank';
 
 import createGraph, { Graph } from 'ngraph.graph';
 import { EventedType } from 'ngraph.events';
@@ -40,8 +41,8 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      // path: 'assets/manifest.huge.json',
-      path: 'assets/manifest.big.json',
+      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
   ];
@@ -104,7 +105,6 @@ export class Demo implements Experience {
       });
     }
 
-    // for (var i = 0; i < ITERATIONS_MAX; ++i) {
     var energyHistory = [];
     while (true) {
       this.layout.step();
@@ -141,9 +141,21 @@ export class Demo implements Experience {
       this.graph,
       true
     );
+    var degree: { [key: string]: number } = centrality.degree(this.graph);
+    const sizeInterpolator = generateInterpolator(
+      [1, Math.max(...Object.values(degree))],
+      [0.2, 1]
+    );
+
     const maxBetweenness = Math.max(...Object.values(directedBetweenness));
 
-    const interpolator = generateInterpolator([0, maxBetweenness], [0.1, 1.5]);
+    const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
+
+    // var pagerank: { [key: string]: number } = pageRank(this.graph);
+    // const pageRankInterpolator = generateInterpolator(
+    //   [0, Math.max(...Object.values(pagerank))],
+    //   [0.1, 1.5]
+    // );
 
     // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
     let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -167,10 +179,12 @@ export class Demo implements Experience {
       let graphNode = new GraphNode(
         node.data.unique_id,
         node.data,
-        interpolator(directedBetweenness[node.id]),
+        interpolator(directedBetweenness[node.id]) *
+          sizeInterpolator(degree[node.id]),
         new THREE.Color(color),
         {
           betweenness: directedBetweenness[node.id],
+          degree: degree[node.id],
         }
       );
 

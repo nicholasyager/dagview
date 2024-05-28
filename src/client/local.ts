@@ -43,7 +43,10 @@ export class ManifestLoader {
   ): void {
     fetch(url)
       .then((response) => {
-        if (onProgress) onProgress({ url, loaded: 1, total: 1 });
+        if (onProgress) {
+          onProgress({ url, loaded: 1, total: 1 });
+          this.loadingManager.onProgress(url, 1, 1);
+        }
         return response.json();
       })
       .then((manifest) => {
