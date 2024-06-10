@@ -8,7 +8,6 @@ import { GraphNode } from './GraphNode';
 
 import createLayout, { Layout } from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
-import pageRank from 'ngraph.pagerank';
 
 import createGraph, { Graph } from 'ngraph.graph';
 import { EventedType } from 'ngraph.events';
@@ -16,6 +15,7 @@ import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
+import { PowerGraph } from './PowerGraph';
 
 const MAX_ENERGY = 0.1;
 
@@ -30,8 +30,8 @@ function generateInterpolator(
 }
 
 export class Demo implements Experience {
-  graph: Graph<any, any> & EventedType;
-  layout: Layout<any>;
+  // graph: Graph<any, any> & EventedType;
+  // layout: Layout<any>;
   nodes: { [key: string]: GraphNode };
   edges: { [key: string]: GraphEdge2 };
   iterations: number;
@@ -41,20 +41,13 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
-      // path: 'assets/manifest.small.json',
+      path: 'assets/manifest.small.json',
     },
   ];
 
   constructor(private engine: Engine) {
-    this.graph = createGraph();
-    this.layout = createLayout(this.graph, {
-      dimensions: 3,
-      // dragCoefficient: 0.99,
-      springLength: 0.05,
-      gravity: -6,
-    });
     this.nodes = {};
     this.edges = {};
     this.iterations = 0;
@@ -76,40 +69,22 @@ export class Demo implements Experience {
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
 
-    for (let [key, value] of Object.entries(manifest.nodes)) {
-      if (key.startsWith('test')) continue;
-      this.graph.addNode(key, value);
-    }
+    const graph = this.generateGraphFromManifest(manifest);
 
-    for (let [key, value] of Object.entries(manifest.sources)) {
-      this.graph.addNode(key, value);
-    }
+    const powerGraph = new PowerGraph(graph);
 
-    for (let [source, targets] of Object.entries(manifest.child_map)) {
-      if (source.startsWith('test')) continue;
-      if (source.startsWith('exposure')) continue;
-      if (!this.graph.hasNode(source)) continue;
-
-      targets.forEach((target: string) => {
-        if (!this.graph.hasNode(target)) return;
-        this.graph?.addLink(source, target);
-      });
-    }
-
-    for (let [target, sources] of Object.entries(manifest.parent_map)) {
-      if (target.startsWith('test')) continue;
-      if (target.startsWith('exposure')) continue;
-      sources.forEach((source: string) => {
-        if (!this.graph.hasNode(source)) return;
-        this.graph?.addLink(source, target);
-      });
-    }
+    const layout = createLayout(graph, {
+      dimensions: 3,
+      // dragCoefficient: 0.99,
+      springLength: 0.05,
+      gravity: -6,
+    });
 
     var energyHistory = [];
     while (true) {
-      this.layout.step();
+      layout.step();
 
-      energyHistory.push(this.layout.getForceVectorLength());
+      energyHistory.push(layout.getForceVectorLength());
 
       let evaluationRange = energyHistory.slice(
         energyHistory.length -
@@ -138,10 +113,10 @@ export class Demo implements Experience {
     }
 
     var directedBetweenness: { [key: string]: number } = centrality.betweenness(
-      this.graph,
+      graph,
       true
     );
-    var degree: { [key: string]: number } = centrality.degree(this.graph);
+    var degree: { [key: string]: number } = centrality.degree(graph);
     const sizeInterpolator = generateInterpolator(
       [1, Math.max(...Object.values(degree))],
       [0.2, 1]
@@ -151,17 +126,11 @@ export class Demo implements Experience {
 
     const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
 
-    // var pagerank: { [key: string]: number } = pageRank(this.graph);
-    // const pageRankInterpolator = generateInterpolator(
-    //   [0, Math.max(...Object.values(pagerank))],
-    //   [0.1, 1.5]
-    // );
-
     // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
     let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-    this.graph.forEachNode((node) => {
-      let position = this.layout.getNodePosition(node.id);
+    graph.forEachNode((node) => {
+      let position = layout.getNodePosition(node.id);
 
       if (!node.data) {
         return;
@@ -201,9 +170,9 @@ export class Demo implements Experience {
       this.engine.scene.add(graphNode);
     });
 
-    this.graph.forEachLink((link) => {
-      let sourceNode = this.graph.getNode(link.fromId);
-      let targetNode = this.graph.getNode(link.toId);
+    graph.forEachLink((link) => {
+      let sourceNode = graph.getNode(link.fromId);
+      let targetNode = graph.getNode(link.toId);
 
       if (!sourceNode || !targetNode) return;
 
@@ -225,6 +194,39 @@ export class Demo implements Experience {
       this.edges[link.id] = graphEdge;
       this.engine.scene.add(graphEdge);
     });
+  }
+
+  generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
+    let graph = createGraph();
+    for (let [key, value] of Object.entries(manifest.nodes)) {
+      if (key.startsWith('test')) continue;
+      graph.addNode(key, value);
+    }
+
+    for (let [key, value] of Object.entries(manifest.sources)) {
+      graph.addNode(key, value);
+    }
+
+    for (let [source, targets] of Object.entries(manifest.child_map)) {
+      if (source.startsWith('test')) continue;
+      if (source.startsWith('exposure')) continue;
+      if (!graph.hasNode(source)) continue;
+
+      targets.forEach((target: string) => {
+        if (!graph.hasNode(target)) return;
+        graph?.addLink(source, target);
+      });
+    }
+
+    for (let [target, sources] of Object.entries(manifest.parent_map)) {
+      if (target.startsWith('test')) continue;
+      if (target.startsWith('exposure')) continue;
+      sources.forEach((source: string) => {
+        if (!graph.hasNode(source)) return;
+        graph?.addLink(source, target);
+      });
+    }
+    return graph;
   }
 
   resize() {}
