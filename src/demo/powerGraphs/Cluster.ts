@@ -22,4 +22,19 @@ export class Cluster {
 
     return new Cluster(newItems);
   }
+
+  intersection(otherCluster: Cluster) {
+    let intersection = new Set<string>();
+    for (let elem of this.items) {
+      if (otherCluster.items.has(elem)) {
+        intersection.add(elem);
+      }
+    }
+
+    return new Cluster(intersection);
+  }
+
+  size(): number {
+    return this.items.size;
+  }
 }
