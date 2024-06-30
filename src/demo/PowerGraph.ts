@@ -1,4 +1,3 @@
-import { max } from 'd3';
 import createGraph, { Graph } from 'ngraph.graph';
 import { SimilarityMatrix } from './powerGraphs/SimilarityMatrix';
 import { Cluster } from './powerGraphs/Cluster';
@@ -298,6 +297,9 @@ export class PowerGraph {
             return edge[0] != edge[1];
           })
           .map((edge) => {
+            if (!edge) {
+              return;
+            }
             console.log(
               edge,
               edge[0],
