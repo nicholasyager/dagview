@@ -1,8 +1,27 @@
+function intersection<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
+  let intersection = new Set<T>();
+  for (let elem of set) {
+    if (otherSet.has(elem)) {
+      intersection.add(elem);
+    }
+  }
+  return intersection;
+}
+
+function union<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
+  let newItems = new Set(set);
+
+  otherSet.forEach((item) => newItems.add(item));
+  return newItems;
+}
+
 export class Cluster {
   items: Set<string>;
+  parents: Set<string>;
 
-  constructor(items: Iterable<string> | undefined) {
+  constructor(items: Iterable<string>, parents: Iterable<string>) {
     this.items = new Set(items);
+    this.parents = new Set(parents);
   }
 
   forEach(func: (element: any) => void) {
@@ -16,22 +35,17 @@ export class Cluster {
   }
 
   union(otherCluster: Cluster): Cluster {
-    let newItems = new Set(this.items);
-
-    otherCluster.forEach((item) => newItems.add(item));
-
-    return new Cluster(newItems);
+    return new Cluster(
+      union(this.items, otherCluster.items),
+      union(this.parents, otherCluster.parents)
+    );
   }
 
   intersection(otherCluster: Cluster) {
-    let intersection = new Set<string>();
-    for (let elem of this.items) {
-      if (otherCluster.items.has(elem)) {
-        intersection.add(elem);
-      }
-    }
-
-    return new Cluster(intersection);
+    return new Cluster(
+      intersection(this.items, otherCluster.items),
+      intersection(this.parents, otherCluster.parents)
+    );
   }
 
   size(): number {

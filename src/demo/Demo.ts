@@ -41,9 +41,9 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
-      // path: 'assets/manifest.small.json',
+      path: 'assets/manifest.small.json',
     },
   ];
 
@@ -71,7 +71,7 @@ export class Demo implements Experience {
 
     const graph = this.generateGraphFromManifest(manifest);
 
-    // const powerGraph = new PowerGraph(graph);
+    const powerGraph = new PowerGraph(graph);
 
     const layout = createLayout(graph, {
       dimensions: 3,

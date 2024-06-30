@@ -2,16 +2,7 @@ import createGraph, { Graph } from 'ngraph.graph';
 import { SimilarityMatrix } from './powerGraphs/SimilarityMatrix';
 import { Cluster } from './powerGraphs/Cluster';
 
-type ElementType<A> = A extends ReadonlyArray<infer T> ? T : never;
-
-type ElementsOfAll<
-  Inputs,
-  R extends ReadonlyArray<unknown> = []
-> = Inputs extends readonly [infer F, ...infer M]
-  ? ElementsOfAll<M, [...R, ElementType<F>]>
-  : R;
-
-type CartesianProduct<Inputs> = ElementsOfAll<Inputs>[];
+type CartesianProduct<Inputs> = [string, string];
 
 function cartesianProduct<Sets extends ReadonlyArray<ReadonlyArray<unknown>>>(
   sets: Sets
@@ -42,6 +33,10 @@ export class PowerGraph {
   minimumSimilarity: number;
 
   similarityMatrix: SimilarityMatrix;
+
+  getClusterPeers(): [Cluster, Cluster][] {
+    return [];
+  }
 
   getClusterPairs(): [Cluster, Cluster][] {
     return Object.values(this.clusters).flatMap((cluster, index) =>
