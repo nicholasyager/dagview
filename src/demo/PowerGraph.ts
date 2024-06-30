@@ -48,6 +48,24 @@ export class PowerGraph {
     );
   }
 
+  parents(nodes: Set<string>): Set<string> {
+    // Find the parent nodes for a set of nodes.
+    let parents: Set<string> = new Set();
+
+    nodes.forEach((node) => {
+      console.log(node);
+      const links = this.graph.getLinks(node);
+      if (!links) return;
+
+      Array.from(links).forEach((link) => {
+        if (link.fromId == node) return;
+        parents.add(link.fromId as string);
+      });
+    });
+
+    return parents;
+  }
+
   neighborhood(cluster: Cluster): Set<string> {
     // Find all of the neighbors within the neighborhood of a cluster.
     let neighborhood: Set<string> = new Set();
@@ -101,7 +119,13 @@ export class PowerGraph {
     this.graph.forEachNode((node) => {
       if (!node.id) return;
 
-      let cluster = new Cluster([node.id as string]);
+      let parents = [];
+
+      // let parents = Array.from(this.graph.getLinks(node.id) || [])
+      //   .filter((link) => (link.toId = node.id))
+      //   .map((link) => link.fromId as string);
+
+      let cluster = new Cluster([node.id as string], parents);
 
       this.clusters[cluster.getId()] = cluster;
       this.remainingClusters[cluster.getId()] = cluster;
@@ -188,7 +212,8 @@ export class PowerGraph {
     // For each Cluster in this.clusters, find the neighborhood and add it if the similarity
     // between the Cluster and the Neighborhood is less than the minimum similarity threshold.
     Object.entries(this.clusters).forEach(([index, cluster]) => {
-      const neighborhood = new Cluster(this.neighborhood(cluster));
+      const neighbors = this.neighborhood(cluster);
+      const neighborhood = new Cluster(neighbors, this.parents(neighbors));
       const similarity = this.calculateNeighborhoodSimilarity(
         cluster,
         neighborhood
@@ -211,7 +236,8 @@ export class PowerGraph {
     // For each Cluster in this.clusters, find the neighborhood and add it if the similarity
     // between the Cluster and the Neighborhood is less than the minimum similarity threshold.
     Object.entries(this.clusters).forEach(([index, cluster]) => {
-      const neighborhood = new Cluster(this.neighborhood(cluster));
+      const neighbors = this.neighborhood(cluster);
+      const neighborhood = new Cluster(neighbors, this.parents(neighbors));
       const similarity = this.calculateNeighborhoodSimilarity(
         cluster,
         neighborhood
