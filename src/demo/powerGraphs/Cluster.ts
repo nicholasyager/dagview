@@ -1,4 +1,4 @@
-function intersection<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
+export function intersection<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
   let intersection = new Set<T>();
   for (let elem of set) {
     if (otherSet.has(elem)) {
@@ -8,10 +8,17 @@ function intersection<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
   return intersection;
 }
 
-function union<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
+export function union<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
   let newItems = new Set(set);
 
   otherSet.forEach((item) => newItems.add(item));
+  return newItems;
+}
+
+export function difference<T>(set: Set<T>, otherSet: Set<T>): Set<T> {
+  let newItems = new Set(set);
+
+  otherSet.forEach((item) => newItems.delete(item));
   return newItems;
 }
 
@@ -48,7 +55,20 @@ export class Cluster {
     );
   }
 
+  difference(otherCluster: Cluster) {
+    return new Cluster(
+      difference(this.items, otherCluster.items),
+      difference(this.parents, otherCluster.parents)
+    );
+  }
+
   size(): number {
     return this.items.size;
+  }
+
+  isClique(graph: Graph): Boolean {
+    //Determine if this cluster is a clique in graph.
+
+    return false;
   }
 }

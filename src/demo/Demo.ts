@@ -71,7 +71,9 @@ export class Demo implements Experience {
 
     const graph = this.generateGraphFromManifest(manifest);
 
-    const powerGraph = new PowerGraph(graph);
+    // const powerGraph = new PowerGraph(baseGraph);
+
+    // const graph = powerGraph.hypergraph;
 
     const layout = createLayout(graph, {
       dimensions: 3,
@@ -131,8 +133,10 @@ export class Demo implements Experience {
 
     graph.forEachNode((node) => {
       let position = layout.getNodePosition(node.id);
+      console.log({ node, position });
 
       if (!node.data) {
+        console.log(node);
         return;
       }
 

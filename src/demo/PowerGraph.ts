@@ -1,6 +1,6 @@
 import createGraph, { Graph } from 'ngraph.graph';
 import { SimilarityMatrix } from './powerGraphs/SimilarityMatrix';
-import { Cluster } from './powerGraphs/Cluster';
+import { Cluster, difference, intersection } from './powerGraphs/Cluster';
 
 type CartesianProduct<Inputs> = [string, string];
 
@@ -119,11 +119,15 @@ export class PowerGraph {
     this.graph.forEachNode((node) => {
       if (!node.id) return;
 
-      let parents = [];
+      if (node.id == null) return;
 
-      // let parents = Array.from(this.graph.getLinks(node.id) || [])
-      //   .filter((link) => (link.toId = node.id))
-      //   .map((link) => link.fromId as string);
+      let parents: string[] = [];
+
+      this.graph.getLinks(node.id).forEach((item) => {
+        if (item.toId == node.id) {
+          parents.push(item.fromId as string);
+        }
+      });
 
       let cluster = new Cluster([node.id as string], parents);
 
@@ -259,8 +263,12 @@ export class PowerGraph {
     // Start populating the hypergraph. We'll begin by adding all singleton clusters as vertices in the hypergraph.
     Object.values(this.clusters).forEach((cluster) => {
       if (cluster.size() > 1) return;
-      console.log(cluster.getId());
-      this.hypergraph.addNode(Array.from(cluster.items)[0]);
+      const node = this.graph.getNode(cluster.getId());
+
+      this.hypergraph.addNode(cluster.getId(), {
+        cluster: cluster,
+        dbt: node.data,
+      });
     });
 
     // Line 17 - 23: For each unordered pair of clusters, identify poweredges
@@ -349,6 +357,93 @@ export class PowerGraph {
         }
       }
     });
+
+    // Sort power edges
+    let iterations = 0;
+    while (this.powerEdges.size > 0 && iterations < 10) {
+      const edges = Array.from(this.powerEdges).sort((a, b) => b.size - a.size);
+
+      const edge = edges.pop();
+
+      if (!edge) continue;
+
+      const sourceCluster = this.clusters[edge.from];
+      const targetCluster = this.clusters[edge.to];
+
+      // If the size of power edge (U, W) is two and U = W then do nothing
+      if (edge?.from == edge?.to && edge?.size == 2) continue;
+
+      // For each
+      this.hypergraph.forEachNode((cluster) => {
+        let nodeIntersection = sourceCluster.intersection(cluster.data.cluster);
+
+        let differenceA = sourceCluster.difference(cluster.data.cluster);
+        let differenceB = cluster.data.cluster.difference(sourceCluster);
+
+        console.log(nodeIntersection, differenceA, differenceB);
+
+        if (
+          nodeIntersection.size() > 0 &&
+          differenceA.size() > 0 &&
+          differenceB.size() > 0
+        ) {
+          this.clusters[differenceA.getId()] = differenceA;
+          this.powerEdges.add(
+            new PowerEdge(
+              differenceA.getId(),
+              targetCluster.getId(),
+              differenceA.size() + targetCluster.size()
+            )
+          );
+
+          this.clusters[nodeIntersection.getId()] = nodeIntersection;
+          this.powerEdges.add(
+            new PowerEdge(
+              nodeIntersection.getId(),
+              targetCluster.getId(),
+              nodeIntersection.size() + targetCluster.size()
+            )
+          );
+        }
+      });
+
+      this.hypergraph.forEachNode((cluster) => {
+        let nodeIntersection = targetCluster.intersection(cluster.data.cluster);
+
+        let differenceA = targetCluster.difference(cluster.data.cluster);
+        let differenceB = cluster.data.cluster.difference(targetCluster);
+
+        console.log(nodeIntersection, differenceA, differenceB);
+
+        if (
+          nodeIntersection.size() > 0 &&
+          differenceA.size() > 0 &&
+          differenceB.size() > 0
+        ) {
+          this.clusters[differenceA.getId()] = differenceA;
+          this.powerEdges.add(
+            new PowerEdge(
+              differenceA.getId(),
+              targetCluster.getId(),
+              differenceA.size() + targetCluster.size()
+            )
+          );
+
+          this.clusters[nodeIntersection.getId()] = nodeIntersection;
+          this.powerEdges.add(
+            new PowerEdge(
+              nodeIntersection.getId(),
+              targetCluster.getId(),
+              nodeIntersection.size() + targetCluster.size()
+            )
+          );
+        }
+      });
+
+      iterations++;
+      console.log({ edges, iterations });
+      // break;
+    }
 
     console.log(this.hypergraph.getNodesCount());
     console.log(this.powerEdges);
