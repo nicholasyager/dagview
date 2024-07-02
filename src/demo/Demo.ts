@@ -16,6 +16,7 @@ import { GraphEdge2 } from './GraphEdge';
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
 import { PowerGraph } from './PowerGraph';
+import init, { greet } from 'powergraph';
 
 const MAX_ENERGY = 0.1;
 
@@ -52,6 +53,11 @@ export class Demo implements Experience {
     this.edges = {};
     this.iterations = 0;
     this.selectedNodes = [];
+
+    init().then(() => {
+      console.log('init wasm-pack');
+      greet('from vite!');
+    });
   }
 
   init() {
