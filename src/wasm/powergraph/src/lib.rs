@@ -8,6 +8,6 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, {{project-name}}!");
+pub fn greet(value: &str) {
+    alert(&format!("Hello, {}!", &value));
 }
