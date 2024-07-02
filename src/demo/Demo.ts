@@ -73,7 +73,7 @@ export class Demo implements Experience {
 
     // const powerGraph = new PowerGraph(baseGraph);
 
-    // const graph = powerGraph.hypergraph;
+    // const graph = powerGraph.hypergraph.graph;
 
     const layout = createLayout(graph, {
       dimensions: 3,
@@ -142,7 +142,7 @@ export class Demo implements Experience {
 
       node.data['owner'] = undefined;
       node.data['schema'];
-      let metadata = node.data['meta'];
+      let metadata = node.data['meta'] || {};
       if (metadata.hasOwnProperty('atlan')) {
         node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
       }
