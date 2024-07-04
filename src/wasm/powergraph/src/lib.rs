@@ -1,7 +1,10 @@
+mod clusters;
+mod sets;
 mod utils;
 
-use std::{collections::HashSet, hash::Hash};
+use std::collections::HashSet;
 
+use clusters::Cluster;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -16,6 +19,7 @@ pub fn greet(value: &str) {
 
 type NodeId = String;
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct Node {
     id: NodeId,
     data: String,
@@ -46,11 +50,6 @@ impl Edge {
     }
 }
 
-#[wasm_bindgen]
-pub struct Cluster {
-    nodes: HashSet<u32>,
-}
-
 type PowerNodeId = String;
 
 #[wasm_bindgen]
@@ -68,7 +67,7 @@ pub struct PowerEdge {
 #[wasm_bindgen]
 struct SimilarityMatrix {
     matrix: Vec<Vec<f32>>,
-    inactive_clusters: HashSet<usize>,
+    inactive_clusters: HashSet<u32>,
 }
 
 #[wasm_bindgen]
@@ -79,7 +78,7 @@ impl SimilarityMatrix {
         let size = clusters.len();
 
         for _ in clusters {
-            let mut new_vector = vec![0.0_f32; size];
+            let new_vector = vec![0.0_f32; size];
             matrix.push(new_vector);
         }
 
@@ -111,10 +110,34 @@ impl PowerGraph {
     }
 
     #[wasm_bindgen]
-    pub fn deconstruct() {
-        let c: Vec<Cluster> = Vec::new();
-        let c_prime: Vec<Cluster> = Vec::new();
-        let similarity_matrix: Vec<Vec<usize>> = Vec::new();
+    pub fn deconstruct(&mut self) {
+        let mut c: Vec<Cluster> = Vec::new();
+        let mut c_prime: Vec<Cluster> = Vec::new();
+
+        // Add all nodes to c and c_prime as singleton clusters.
+        for (index, node) in (&self.nodes).into_iter().enumerate() {
+            println!("Node: {:?}", node);
+
+            let cluster_nodes = Cluster::new(
+                vec![index as u32],
+                self.edges
+                    .iter()
+                    .filter_map(|edge| {
+                        if edge.to == node.id {
+                            let index = self.nodes.iter().position(|r| r.id == edge.from).unwrap();
+                            return Some(index as u32);
+                        }
+
+                        None
+                    })
+                    .collect(),
+            );
+
+            c.push(cluster_nodes);
+        }
+        c_prime = c.clone();
+
+        let similarity_matrix = SimilarityMatrix::new(c);
     }
 }
 
