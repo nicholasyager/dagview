@@ -1,10 +1,10 @@
 mod clusters;
 mod sets;
+mod similarity_matrix;
 mod utils;
 
-use std::collections::HashSet;
-
 use clusters::Cluster;
+use similarity_matrix::SimilarityMatrix;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -62,31 +62,6 @@ pub struct PowerNode {
 pub struct PowerEdge {
     from: PowerNodeId,
     to: PowerNodeId,
-}
-
-#[wasm_bindgen]
-struct SimilarityMatrix {
-    matrix: Vec<Vec<f32>>,
-    inactive_clusters: HashSet<u32>,
-}
-
-#[wasm_bindgen]
-impl SimilarityMatrix {
-    #[wasm_bindgen(constructor)]
-    pub fn new(clusters: Vec<Cluster>) -> SimilarityMatrix {
-        let mut matrix: Vec<Vec<f32>> = Vec::new();
-        let size = clusters.len();
-
-        for _ in clusters {
-            let new_vector = vec![0.0_f32; size];
-            matrix.push(new_vector);
-        }
-
-        SimilarityMatrix {
-            matrix: matrix,
-            inactive_clusters: HashSet::new(),
-        }
-    }
 }
 
 #[wasm_bindgen]
