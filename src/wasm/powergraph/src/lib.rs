@@ -112,7 +112,7 @@ impl PowerGraph {
         }
         c_prime = c.clone();
 
-        let similarity_matrix = SimilarityMatrix::new(c);
+        let similarity_matrix = SimilarityMatrix::new(c.len());
     }
 }
 
