@@ -1,11 +1,26 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Set<T> {
     items: Vec<T>,
 }
 
-impl<T: std::cmp::PartialEq + Clone> Set<T> {
+impl<T: std::cmp::PartialEq + Clone + Copy> Set<T> {
+    pub fn new() -> Set<T> {
+        Set { items: Vec::new() }
+    }
+
     pub fn from_iter(items: Vec<T>) -> Set<T> {
         Set { items }
+    }
+
+    pub fn insert(&mut self, item: T) {
+        if self.contains(item) {
+            return;
+        }
+        self.items.push(item);
+    }
+
+    pub fn contains(&self, item: T) -> bool {
+        return self.items.contains(&item);
     }
 
     pub fn intersection(&self, other_cluster: &Set<T>) -> Set<T> {
@@ -46,6 +61,10 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn to_vec(&self) -> Vec<T> {
+        return self.items.clone();
     }
 }
 
