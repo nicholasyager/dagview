@@ -16,8 +16,8 @@ extern "C" {
 
     // Use `js_namespace` here to bind `console.log(..)` instead of just
     // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
+    // #[wasm_bindgen(js_namespace = console)]
+    // fn log(s: &str);
 }
 
 macro_rules! console_log {
@@ -33,7 +33,7 @@ pub fn greet(value: &str) {
 
 type NodeId = String;
 #[wasm_bindgen]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
     id: NodeId,
     data: String,
@@ -101,23 +101,35 @@ impl PowerGraph {
         }
     }
 
+    fn get_node(&self, node_id: &NodeId) -> Option<Node> {
+        for node in self.nodes.iter() {
+            if node.id == *node_id {
+                return Some(node.clone());
+            }
+        }
+
+        println!("Unable to find {:?} in {:?}", node_id, self.nodes);
+
+        return None;
+    }
+
     fn node_id_to_index(&self) {}
 
     /// For a given Cluster, find all node names for sibling nodes.
-    fn find_siblings(&self, cluster: &Cluster) -> Set<&str> {
+    fn find_siblings(&self, cluster: &Cluster) -> Set<String> {
         let mut output = Set::from_iter(Vec::new());
 
         // Find all children of parents. This will be the selected cluster's generation.
 
-        for parent_index in cluster.get_parents() {
-            let parent = &self.nodes[parent_index];
+        for neighbor_id in cluster.get_neighbors() {
+            let neighbor = self.get_node(&neighbor_id).unwrap();
 
-            let children: Vec<&str> = self
+            let children: Vec<String> = self
                 .edges
                 .iter()
                 .filter_map(|edge| {
-                    if edge.from == parent.id {
-                        return Some(edge.to.as_str());
+                    if edge.from == neighbor.id {
+                        return Some(edge.to.clone());
                     }
 
                     None
@@ -129,19 +141,27 @@ impl PowerGraph {
             }
         }
 
-        let cluster_set = Set::from_iter(
-            cluster
-                .get_items()
-                .iter()
-                .map(|node_index| {
-                    let node = self.nodes.get(*node_index).unwrap();
-                    return node.id.as_str();
-                })
-                .collect(),
-        );
+        let cluster_set = Set::from_iter(cluster.get_items());
 
         // Return the list.
-        return output.difference(&cluster_set);
+        return (output.difference(&cluster_set)).clone();
+    }
+
+    fn neighbors(&self, node_id: &NodeId) -> Set<String> {
+        let node_ids = self
+            .edges
+            .iter()
+            .filter_map(|edge| {
+                if edge.from == *node_id {
+                    return Some(edge.to.clone());
+                } else if edge.to == *node_id {
+                    return Some(edge.from.clone());
+                }
+                None
+            })
+            .collect();
+
+        Set::from_iter(node_ids)
     }
 
     #[wasm_bindgen]
@@ -155,18 +175,14 @@ impl PowerGraph {
             // console_log!("Node: {:?}", node);
 
             let cluster_nodes = Cluster::new(
-                vec![index],
-                self.edges
-                    .iter()
-                    .filter_map(|edge| {
-                        if edge.to == node.id {
-                            let index = self.nodes.iter().position(|r| r.id == edge.from).unwrap();
-                            return Some(index);
-                        }
-
-                        None
-                    })
-                    .collect(),
+                Set::from_iter(vec![node.id.clone()]),
+                Set::from_iter(
+                    self.neighbors(&node.id)
+                        .to_vec()
+                        .into_iter()
+                        .map(|item| item.to_string())
+                        .collect(),
+                ),
             );
 
             c.push(cluster_nodes);
@@ -204,7 +220,7 @@ impl PowerGraph {
         // Find the two clusters with maximum similarity
         let mut max_similarity = similarity_matrix.get_max_similarity();
 
-        while c_prime.len() > 0 && max_similarity.1 > 0.5_f32 {
+        while c_prime.len() > 0 && max_similarity.1 >= 0.5_f32 {
             println!("Max similarity: {:?}", max_similarity);
             println!("{:?}", c);
             println!("{:?}", c_prime);
@@ -242,13 +258,13 @@ impl PowerGraph {
             c_prime.push(unioned_cluster.clone());
 
             // Calculate new similarities for the added element.
-            let cluster_parents = Set::from_iter(unioned_cluster.get_parents());
+            let cluster_parents = Set::from_iter(unioned_cluster.get_neighbors());
             for comparison_cluster in c_prime.iter() {
                 if unioned_cluster == *comparison_cluster {
                     continue;
                 }
 
-                let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_parents());
+                let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_neighbors());
 
                 if cluster_parents
                     .intersection(&comparison_cluster_parents)
@@ -327,10 +343,16 @@ mod tests {
         ];
 
         let powergraph = PowerGraph::new(nodes, edges);
-        let cluster = Cluster::new(vec![1], vec![0]);
+        let cluster = Cluster::new(
+            Set::from_iter(vec!["child".to_string()]),
+            powergraph.neighbors(&"child".to_string()),
+        );
         let siblings = powergraph.find_siblings(&cluster);
 
-        assert_eq!(siblings, Set::from_iter(vec!["sibling", "sibling2"]));
+        assert_eq!(
+            siblings,
+            Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
+        );
     }
 
     #[test]
@@ -355,10 +377,16 @@ mod tests {
         ];
 
         let powergraph = PowerGraph::new(nodes, edges);
-        let cluster = Cluster::new(vec![3], vec![0, 1, 2]);
+        let cluster = Cluster::new(
+            Set::from_iter(vec!["child".to_string()]),
+            powergraph.neighbors(&"child".to_string()),
+        );
         let siblings = powergraph.find_siblings(&cluster);
 
-        assert_eq!(siblings, Set::from_iter(vec!["sibling", "sibling2"]));
+        assert_eq!(
+            siblings,
+            Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
+        );
     }
 
     // #[test]

@@ -1,29 +1,22 @@
 use crate::{sets::Set, unordered_tuple::UnorderedTuple};
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cluster {
-    items: Set<usize>,
-    parents: Set<usize>,
+    items: Set<String>,
+    neighbors: Set<String>,
 }
 
-#[wasm_bindgen]
 impl Cluster {
-    #[wasm_bindgen(constructor)]
-    pub fn new(items: Vec<usize>, parents: Vec<usize>) -> Cluster {
-        Cluster {
-            items: Set::from_iter(items),
-            parents: Set::from_iter(parents),
-        }
+    pub fn new(items: Set<String>, neighbors: Set<String>) -> Cluster {
+        Cluster { items, neighbors }
     }
 
     /// Compute the similarity score between two Clusters. Similarity is
     /// The Jaccard index of the parent nodes for each cluster.
-    #[wasm_bindgen]
+
     pub fn similarity(&self, other_cluster: &Cluster) -> f32 {
-        let intersection = self.parents.intersection(&other_cluster.parents);
-        let union = self.parents.union(&other_cluster.parents);
+        let intersection = self.neighbors.intersection(&other_cluster.neighbors);
+        let union = self.neighbors.union(&other_cluster.neighbors);
 
         let similarity = intersection.len() as f32 / union.len() as f32;
 
@@ -36,17 +29,17 @@ impl Cluster {
 
     pub fn union(self, other_cluster: &Cluster) -> Cluster {
         let unioned_items = self.items.union(&other_cluster.items);
-        let unioned_parents = self.parents.union(&other_cluster.parents);
+        let unioned_parents = self.neighbors.union(&other_cluster.neighbors);
 
-        Cluster::new(unioned_items.to_vec(), unioned_parents.to_vec())
+        Cluster::new(unioned_items, unioned_parents)
     }
 
-    pub fn add_item(&mut self, item: usize) {
+    pub fn add_item(&mut self, item: String) {
         self.items.insert(item);
     }
 
-    pub fn add_parent(&mut self, parent: usize) {
-        self.items.insert(parent);
+    pub fn add_neighbor(&mut self, neighbor: String) {
+        self.neighbors.insert(neighbor);
     }
 
     pub fn get_id(&self) -> String {
@@ -60,11 +53,11 @@ impl Cluster {
             .clone();
     }
 
-    pub fn get_parents(&self) -> Vec<usize> {
-        return self.parents.to_vec();
+    pub fn get_neighbors(&self) -> Vec<String> {
+        return self.neighbors.to_vec();
     }
 
-    pub fn get_items(&self) -> Vec<usize> {
+    pub fn get_items(&self) -> Vec<String> {
         return self.items.to_vec();
     }
 }
@@ -78,8 +71,8 @@ pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple> {
                 continue;
             }
 
-            let cluster_parents = Set::from_iter(cluster.get_parents());
-            let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_parents());
+            let cluster_parents = Set::from_iter(cluster.get_neighbors());
+            let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_neighbors());
 
             if cluster_parents
                 .intersection(&comparison_cluster_parents)
@@ -90,8 +83,8 @@ pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple> {
             }
 
             comparison_set.insert(UnorderedTuple {
-                one: cluster.get_id().clone(),
-                two: comparison_cluster.get_id().clone(),
+                one: cluster.get_id().to_string(),
+                two: comparison_cluster.get_id().to_string(),
             });
         }
     }
@@ -109,34 +102,69 @@ mod tests {
 
     #[test]
     fn trivial_positive_case() {
-        let set1 = Cluster::new(vec![2], vec![1_usize]);
-        let set2 = Cluster::new(vec![2], vec![1_usize]);
+        let set1 = Cluster::new(
+            Set::from_iter(vec!["2".to_string()]),
+            Set::from_iter(vec!["1".to_string()]),
+        );
+        let set2 = Cluster::new(
+            Set::from_iter(vec!["2".to_string()]),
+            Set::from_iter(vec!["1".to_string()]),
+        );
 
         assert_eq!(set1.similarity(&set2), 1.0_f32)
     }
 
     #[test]
     fn trivial_negative_case() {
-        let set1 = Cluster::new(vec![2], vec![1_usize]);
-        let set2 = Cluster::new(vec![3], vec![2_usize]);
+        let set1 = Cluster::new(
+            Set::from_iter(vec!["2".to_string()]),
+            Set::from_iter(vec!["1".to_string()]),
+        );
+        let set2 = Cluster::new(
+            Set::from_iter(vec!["3".to_string()]),
+            Set::from_iter(vec!["2".to_string()]),
+        );
 
         assert_eq!(set1.similarity(&set2), 0.0_f32)
     }
 
     #[test]
     fn nontrivial_case() {
-        let set1 = Cluster::new(vec![2, 3], vec![0, 1]);
-        let set2 = Cluster::new(vec![4, 5], vec![0, 6, 5, 7]);
+        let set1 = Cluster::new(
+            Set::from_iter(vec!["2".to_string(), "3".to_string()]),
+            Set::from_iter(vec!["0".to_string(), "1".to_string()]),
+        );
+        let set2 = Cluster::new(
+            Set::from_iter(vec!["4".to_string(), "5".to_string()]),
+            Set::from_iter(vec![
+                "0".to_string(),
+                "6".to_string(),
+                "5".to_string(),
+                "7".to_string(),
+            ]),
+        );
 
         assert_eq!(set1.similarity(&set2), 0.2_f32)
     }
 
     #[test]
     fn comparison_sets() {
-        let set1 = Cluster::new(vec![1], vec![]);
-        let set2 = Cluster::new(vec![2], vec![1]);
-        let set3 = Cluster::new(vec![3], vec![1]);
-        let set4 = Cluster::new(vec![4], vec![2]);
+        let set1 = Cluster::new(
+            Set::from_iter(vec!["1".to_string()]),
+            Set::from_iter(vec![]),
+        );
+        let set2 = Cluster::new(
+            Set::from_iter(vec!["2".to_string()]),
+            Set::from_iter(vec!["1".to_string()]),
+        );
+        let set3 = Cluster::new(
+            Set::from_iter(vec!["3".to_string()]),
+            Set::from_iter(vec!["1".to_string()]),
+        );
+        let set4 = Cluster::new(
+            Set::from_iter(vec!["4".to_string()]),
+            Set::from_iter(vec!["2".to_string()]),
+        );
         let clusters = vec![set1, set2, set3, set4];
 
         let comparison_set = generate_comparison_set(&clusters);
