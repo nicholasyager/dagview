@@ -1,11 +1,13 @@
 mod clusters;
 mod sets;
 mod similarity_matrix;
+mod unordered_tuple;
 mod utils;
 
 use clusters::Cluster;
 use sets::Set;
 use similarity_matrix::SimilarityMatrix;
+use unordered_tuple::UnorderedTuple;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -173,86 +175,103 @@ impl PowerGraph {
 
         let mut similarity_matrix = SimilarityMatrix::new();
 
-        let comparison_sets: Set<(usize, usize)> = clusters::generate_comparison_set(&c_prime);
+        let comparison_sets: Set<UnorderedTuple> = clusters::generate_comparison_set(&c_prime);
 
         for comparison_set in comparison_sets.to_vec() {
-            let cluster = c[comparison_set.0].clone();
-            let comparison_cluster = c[comparison_set.1].clone();
+            let cluster_index = c
+                .iter()
+                .position(|item| item.get_id() == comparison_set.one)
+                .unwrap();
+
+            let cluster = c[cluster_index].clone();
+
+            let comparison_cluster_index = c
+                .iter()
+                .position(|item| item.get_id() == comparison_set.two)
+                .unwrap();
+            let comparison_cluster = c[comparison_cluster_index].clone();
 
             let similarity = cluster.similarity(&comparison_cluster);
-            similarity_matrix.set_similarity(comparison_set.0, comparison_set.1, similarity);
+            similarity_matrix.set_similarity(
+                UnorderedTuple {
+                    one: comparison_set.one,
+                    two: comparison_set.two,
+                },
+                similarity,
+            );
         }
 
         // Find the two clusters with maximum similarity
         let mut max_similarity = similarity_matrix.get_max_similarity();
 
-        while c_prime.len() > 0 && max_similarity.2 > 0_f32 {
+        while c_prime.len() > 0 && max_similarity.1 > 0.5_f32 {
             println!("Max similarity: {:?}", max_similarity);
             println!("{:?}", c);
             println!("{:?}", c_prime);
-            println!("{:?} <-> {:?}", c[max_similarity.0], c[max_similarity.1]);
 
-            let mut remove_list = vec![max_similarity.0, max_similarity.1];
+            let cluster_index = c_prime
+                .iter()
+                .position(|item| item.get_id() == max_similarity.0.one)
+                .unwrap();
+
+            let cluster = c_prime[cluster_index].clone();
+
+            let comparison_cluster_index = c_prime
+                .iter()
+                .position(|item| item.get_id() == max_similarity.0.two)
+                .unwrap();
+            let comparison_cluster = c_prime[comparison_cluster_index].clone();
+
+            println!("{:?} <-> {:?}", cluster, comparison_cluster);
+
+            let mut remove_list = vec![cluster_index, comparison_cluster_index];
             remove_list.sort();
             remove_list.reverse();
 
             for item in remove_list {
-                // Get the cluster so we know what we're removing.
-                let cluster = &c[item];
-
-                // Now, find the actual position within c_prime.
-                let position = c_prime
-                    .iter()
-                    .position(|prime_cluster| prime_cluster == cluster)
-                    .unwrap();
-
-                println!("{:?}", c_prime);
-                println!(
-                    "We mapped c index {:?} to c_prime index {:?}. Removing index {:?}.",
-                    item, position, position
-                );
-                c_prime.remove(position);
-                println!("{:?}", c_prime);
-
-                println!("{:?}", similarity_matrix);
-                similarity_matrix.remove_element(item);
-                println!("{:?}", similarity_matrix);
+                c_prime.remove(item);
             }
 
-            let max_cluster_1 = c[max_similarity.0].clone();
+            similarity_matrix.remove_element(cluster.get_id());
+            similarity_matrix.remove_element(comparison_cluster.get_id());
 
-            let unioned_cluster = max_cluster_1.union(&c[max_similarity.1]);
+            let unioned_cluster = cluster.union(&comparison_cluster);
 
             // Add new cluster to everything!
             c.push(unioned_cluster.clone());
             c_prime.push(unioned_cluster.clone());
-            let index = c.len() - 1;
-            println!("Adding index {:?} to the similarity matrix.", index);
-            similarity_matrix.add_element(index);
-            println!("{:?}", similarity_matrix);
 
             // Calculate new similarities for the added element.
-            for (comparison_index, comparison_cluster) in c_prime.iter().enumerate() {
+            let cluster_parents = Set::from_iter(unioned_cluster.get_parents());
+            for comparison_cluster in c_prime.iter() {
                 if unioned_cluster == *comparison_cluster {
                     continue;
                 }
 
-                let cluster_parents = Set::from_iter(unioned_cluster.get_parents());
                 let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_parents());
 
                 if cluster_parents
                     .intersection(&comparison_cluster_parents)
                     .len()
-                    > 0
+                    == 0
                 {
-                    let similarity = unioned_cluster.similarity(comparison_cluster);
-                    similarity_matrix.set_similarity(index, comparison_index, similarity);
+                    continue;
                 }
+                let similarity = unioned_cluster.similarity(&comparison_cluster);
+                similarity_matrix.set_similarity(
+                    UnorderedTuple {
+                        one: unioned_cluster.get_id(),
+                        two: comparison_cluster.get_id(),
+                    },
+                    similarity,
+                );
             }
 
             println!("{:?}", similarity_matrix);
             max_similarity = similarity_matrix.get_max_similarity();
         }
+
+        println!("{:?}", c_prime);
     }
 }
 

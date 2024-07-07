@@ -3,7 +3,7 @@ pub struct Set<T> {
     items: Vec<T>,
 }
 
-impl<T: std::cmp::PartialEq + Clone + Copy> Set<T> {
+impl<T: std::cmp::PartialEq + Clone> Set<T> {
     pub fn new() -> Set<T> {
         Set { items: Vec::new() }
     }
@@ -13,7 +13,7 @@ impl<T: std::cmp::PartialEq + Clone + Copy> Set<T> {
     }
 
     pub fn insert(&mut self, item: T) {
-        if self.contains(item) {
+        if self.contains(item.clone()) {
             return;
         }
         self.items.push(item);

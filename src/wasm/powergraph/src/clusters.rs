@@ -1,4 +1,4 @@
-use crate::sets::Set;
+use crate::{sets::Set, unordered_tuple::UnorderedTuple};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -37,6 +37,7 @@ impl Cluster {
     pub fn union(self, other_cluster: &Cluster) -> Cluster {
         let unioned_items = self.items.union(&other_cluster.items);
         let unioned_parents = self.parents.union(&other_cluster.parents);
+
         Cluster::new(unioned_items.to_vec(), unioned_parents.to_vec())
     }
 
@@ -48,6 +49,17 @@ impl Cluster {
         self.items.insert(parent);
     }
 
+    pub fn get_id(&self) -> String {
+        return self
+            .items
+            .to_vec()
+            .into_iter()
+            .map(|item| item.to_string())
+            .collect::<Vec<String>>()
+            .join("-")
+            .clone();
+    }
+
     pub fn get_parents(&self) -> Vec<usize> {
         return self.parents.to_vec();
     }
@@ -57,11 +69,11 @@ impl Cluster {
     }
 }
 
-pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<(usize, usize)> {
-    let mut comparison_set: Set<(usize, usize)> = Set::new();
+pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple> {
+    let mut comparison_set: Set<UnorderedTuple> = Set::new();
 
-    for (index, cluster) in clusters.iter().enumerate() {
-        for (comparison_index, comparison_cluster) in clusters.iter().enumerate() {
+    for cluster in clusters {
+        for comparison_cluster in clusters {
             if cluster == comparison_cluster {
                 continue;
             }
@@ -77,11 +89,10 @@ pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<(usize, usize)> {
                 continue;
             }
 
-            if comparison_index > index {
-                comparison_set.insert((index, comparison_index));
-            } else {
-                comparison_set.insert((comparison_index, index));
-            }
+            comparison_set.insert(UnorderedTuple {
+                one: cluster.get_id().clone(),
+                two: comparison_cluster.get_id().clone(),
+            });
         }
     }
 
@@ -92,7 +103,7 @@ pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<(usize, usize)> {
 mod tests {
 
     use crate::{
-        clusters::{generate_comparison_set, Cluster},
+        clusters::{generate_comparison_set, Cluster, UnorderedTuple},
         sets::Set,
     };
 
@@ -129,6 +140,20 @@ mod tests {
         let clusters = vec![set1, set2, set3, set4];
 
         let comparison_set = generate_comparison_set(&clusters);
-        assert_eq!(comparison_set, Set::from_iter(vec![(1, 2)]));
+        assert_eq!(
+            comparison_set,
+            Set::from_iter(vec![UnorderedTuple {
+                one: "2".to_string(),
+                two: "3".to_string()
+            }])
+        );
+
+        assert_eq!(
+            comparison_set,
+            Set::from_iter(vec![UnorderedTuple {
+                one: "3".to_string(),
+                two: "2".to_string()
+            }])
+        );
     }
 }

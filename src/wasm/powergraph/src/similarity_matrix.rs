@@ -1,9 +1,10 @@
+use crate::unordered_tuple::UnorderedTuple;
 use std::collections::HashMap;
 
 // #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityMatrix {
-    matrix: HashMap<usize, HashMap<usize, f32>>,
+    matrix: HashMap<UnorderedTuple, f32>,
 }
 
 // #[wasm_bindgen]
@@ -18,49 +19,47 @@ impl SimilarityMatrix {
 
     /// Start tracking another element. Add A new row and column to
     /// the matrix, and add the index to the cluster_index map.
-    pub fn add_element(&mut self, element_id: usize) {
-        self.matrix.insert(element_id, HashMap::new());
-    }
+    // pub fn add_element(&mut self, element_id: &String) {
+    //     self.matrix.insert(element_id.clone(), HashMap::new());
+    // }
 
-    pub fn remove_element(&mut self, element_id: usize) {
+    pub fn remove_element(&mut self, element_id: String) {
         println!("Removing {:?} from the matrix.", element_id);
-        self.matrix.remove(&element_id);
-        for (_, row) in &mut self.matrix {
-            row.remove(&element_id);
+
+        let remove_list: Vec<UnorderedTuple> = self
+            .matrix
+            .clone()
+            .into_iter()
+            .filter_map(|(key, _)| {
+                if key.one == element_id || key.two == element_id {
+                    return Some(key);
+                }
+                None
+            })
+            .collect();
+
+        for key in remove_list {
+            self.matrix.remove(&key);
         }
     }
 
     /// Set the similarity between two clusters based on their index.
-    pub fn set_similarity(
-        &mut self,
-        cluster_index: usize,
-        comparison_cluster_index: usize,
-        similarity: f32,
-    ) {
-        if !self.matrix.contains_key(&cluster_index) {
-            self.add_element(cluster_index);
-        }
-
-        let row = self.matrix.get_mut(&cluster_index).unwrap();
-        row.insert(comparison_cluster_index, similarity);
+    pub fn set_similarity(&mut self, index: UnorderedTuple, similarity: f32) {
+        self.matrix.insert(index, similarity);
     }
 
     // Get the column and row with the largest similarity score
-    pub fn get_max_similarity(&self) -> (usize, usize, f32) {
-        let mut values: Vec<(usize, usize, f32)> = self
+    pub fn get_max_similarity(&self) -> (UnorderedTuple, f32) {
+        let mut values: Vec<(UnorderedTuple, f32)> = self
             .matrix
             .iter()
-            .flat_map(|(index, row)| {
-                row.iter().map(|(col_index, similarity)| {
-                    (index.clone(), col_index.clone(), similarity.clone())
-                })
-            })
+            .map(|(index, similarity)| (index.clone(), similarity.clone()))
             .collect();
 
-        values.sort_by_key(|value| (value.2 * 10000_f32) as u32);
+        values.sort_by_key(|value| (value.1 * 10000_f32) as u32);
         values.reverse();
 
-        return values[0];
+        return values[0].clone();
     }
 
     pub fn len(&self) -> usize {
@@ -71,35 +70,49 @@ impl SimilarityMatrix {
 #[cfg(test)]
 mod test {
 
+    use crate::similarity_matrix::UnorderedTuple;
+
     use super::SimilarityMatrix;
-
-    #[test]
-    fn add_element() {
-        let mut matrix = SimilarityMatrix::new();
-        assert_eq!(matrix.len(), 0);
-
-        matrix.add_element(1);
-        assert_eq!(matrix.len(), 1);
-    }
 
     #[test]
     fn remove_element() {
         let mut matrix = SimilarityMatrix::new();
-        for item in 0..10 {
-            matrix.add_element(item);
-            let row = matrix.matrix.get_mut(&item).unwrap();
-            for value in 0..10_usize {
-                row.insert(value, 0.0_f32);
-            }
-        }
-        assert_eq!(matrix.len(), 10);
 
-        matrix.remove_element(9_usize);
-        assert_eq!(matrix.len(), 9);
+        matrix.set_similarity(
+            UnorderedTuple {
+                one: "foo".to_string(),
+                two: "bar".to_string(),
+            },
+            0.1,
+        );
+        matrix.set_similarity(
+            UnorderedTuple {
+                one: "foo".to_string(),
+                two: "baz".to_string(),
+            },
+            0.75,
+        );
+        matrix.set_similarity(
+            UnorderedTuple {
+                one: "foo".to_string(),
+                two: "buzz".to_string(),
+            },
+            0.7,
+        );
 
-        for (_, row) in matrix.matrix {
-            assert_eq!(row.len(), 9);
-            assert_eq!(row.contains_key(&9_usize), false)
-        }
+        assert_eq!(matrix.len(), 3);
+
+        matrix.remove_element("buzz".to_string());
+        assert_eq!(matrix.len(), 2);
+        assert_eq!(
+            matrix.get_max_similarity(),
+            (
+                UnorderedTuple {
+                    one: "foo".to_string(),
+                    two: "baz".to_string(),
+                },
+                0.75
+            )
+        );
     }
 }
