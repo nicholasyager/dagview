@@ -9,7 +9,12 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
     }
 
     pub fn from_iter(items: Vec<T>) -> Set<T> {
-        Set { items }
+        let mut new_set = Set::new();
+        for item in items {
+            new_set.insert(item);
+        }
+
+        return new_set;
     }
 
     pub fn insert(&mut self, item: T) {

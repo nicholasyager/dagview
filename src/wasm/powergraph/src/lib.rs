@@ -287,7 +287,59 @@ impl PowerGraph {
             max_similarity = similarity_matrix.get_max_similarity();
         }
 
-        println!("{:?}", c_prime);
+        // Add first and second order neighborhoods as clusters in `c`.
+
+        for cluster in c.clone() {
+            let items = cluster.get_neighbors();
+            let neighbors = items
+                .iter()
+                .map(|node| self.neighbors(node))
+                .fold(Set::new(), |acc: Set<String>, e| acc.union(&e));
+            let neighborhood_cluster = Cluster::new(Set::from_iter(items), neighbors);
+
+            let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
+
+            if neighbor_similarity >= 0.5 {
+                println!(
+                    "The similarity between {:?} and {:?} is {:?}. Adding to `c`.",
+                    cluster, neighborhood_cluster, neighbor_similarity
+                );
+
+                c.push(neighborhood_cluster);
+            }
+        }
+
+        // Do it again for second-order neighbors.
+        for cluster in c.clone() {
+            let items = cluster.get_neighbors();
+            let neighbors = items
+                .iter()
+                .map(|node| self.neighbors(node))
+                .fold(Set::new(), |acc: Set<String>, e| acc.union(&e));
+            let neighborhood_cluster = Cluster::new(Set::from_iter(items), neighbors);
+
+            let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
+
+            if neighbor_similarity >= 0.5 {
+                c.push(neighborhood_cluster);
+            }
+        }
+
+        // Deduplicate everything
+        let mut processed_indices: Vec<String> = vec![];
+        let mut deduped_c: Vec<Cluster> = vec![];
+        for item in c {
+            if processed_indices.contains(&item.get_id()) {
+                continue;
+            }
+
+            deduped_c.push(item.clone());
+            processed_indices.push(item.get_id());
+        }
+
+        c = deduped_c;
+
+        println!("{:?}", c);
     }
 }
 

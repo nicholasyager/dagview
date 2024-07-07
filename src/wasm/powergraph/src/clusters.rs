@@ -43,14 +43,16 @@ impl Cluster {
     }
 
     pub fn get_id(&self) -> String {
-        return self
+        let mut values = self
             .items
             .to_vec()
             .into_iter()
             .map(|item| item.to_string())
-            .collect::<Vec<String>>()
-            .join("-")
-            .clone();
+            .collect::<Vec<String>>();
+
+        values.sort();
+
+        return values.join("-").clone();
     }
 
     pub fn get_neighbors(&self) -> Vec<String> {
