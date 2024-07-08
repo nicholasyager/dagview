@@ -5,6 +5,7 @@ mod unordered_tuple;
 mod utils;
 
 use clusters::Cluster;
+use itertools::Itertools;
 use sets::Set;
 use similarity_matrix::SimilarityMatrix;
 use unordered_tuple::UnorderedTuple;
@@ -48,7 +49,7 @@ impl Node {
 }
 
 #[wasm_bindgen]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Edge {
     from: NodeId,
     to: NodeId,
@@ -71,7 +72,7 @@ type PowerNodeId = String;
 #[derive(Debug)]
 pub struct PowerNode {
     id: PowerNodeId,
-    nodes: Vec<Cluster>,
+    cluster: Cluster,
 }
 
 #[wasm_bindgen]
@@ -79,6 +80,13 @@ pub struct PowerNode {
 pub struct PowerEdge {
     from: PowerNodeId,
     to: PowerNodeId,
+}
+
+#[derive(Debug)]
+pub struct PowerEdgeCandidate {
+    from: PowerNodeId,
+    to: PowerNodeId,
+    size: f32,
 }
 
 #[wasm_bindgen]
@@ -111,6 +119,16 @@ impl PowerGraph {
         println!("Unable to find {:?} in {:?}", node_id, self.nodes);
 
         return None;
+    }
+
+    // Given a from index and to index, return the edge if it exists in the graph.
+    fn get_edge(&self, from: &NodeId, to: &NodeId) -> Option<Edge> {
+        for edge in self.edges.iter() {
+            if edge.from == *from && edge.to == *to {
+                return Some(edge.clone());
+            }
+        }
+        None
     }
 
     fn node_id_to_index(&self) {}
@@ -218,12 +236,22 @@ impl PowerGraph {
         }
 
         // Find the two clusters with maximum similarity
-        let mut max_similarity = similarity_matrix.get_max_similarity();
+        let mut max_similarity_result = similarity_matrix.get_max_similarity();
+        println!("{:?}", max_similarity_result);
 
-        while c_prime.len() > 0 && max_similarity.1 >= 0.5_f32 {
+        while c_prime.len() > 0 {
+            match max_similarity_result {
+                Some(_) => (),
+                None => break,
+            }
+
+            let max_similarity = max_similarity_result.unwrap();
+
+            if max_similarity.1 < 0.5_f32 {
+                break;
+            }
+
             println!("Max similarity: {:?}", max_similarity);
-            println!("{:?}", c);
-            println!("{:?}", c_prime);
 
             let cluster_index = c_prime
                 .iter()
@@ -284,7 +312,7 @@ impl PowerGraph {
             }
 
             println!("{:?}", similarity_matrix);
-            max_similarity = similarity_matrix.get_max_similarity();
+            max_similarity_result = similarity_matrix.get_max_similarity();
         }
 
         // Add first and second order neighborhoods as clusters in `c`.
@@ -339,7 +367,110 @@ impl PowerGraph {
 
         c = deduped_c;
 
-        println!("{:?}", c);
+        println!("Complete set of clusters: {:?}.", c);
+
+        // Add singletons to the powergraph
+        for cluster in c.clone().into_iter() {
+            if cluster.get_items().len() > 1 {
+                continue;
+            }
+
+            println!(
+                "{:?} is a singleton. Adding to PowerNodes.",
+                cluster.get_id()
+            );
+
+            let singleton = PowerNode {
+                id: cluster.get_id(),
+                cluster: cluster,
+            };
+
+            self.power_nodes.push(singleton)
+        }
+
+        // Generate candidates for PowerEdges
+        let mut edge_candidates: Vec<PowerEdgeCandidate> = Vec::new();
+
+        for cluster in c.into_iter().combinations(2) {
+            let cluster_one = cluster.get(0).unwrap();
+            let cluster_two = cluster.get(1).unwrap();
+
+            println!(
+                "Checking {:?} and {:?} for poweredge candidates",
+                cluster_one, cluster_two
+            );
+
+            let node_intersection = cluster_one.items.intersection(&cluster_two.items);
+            let node_union = cluster_one.items.union(&cluster_two.items);
+
+            if node_intersection.len() > 0
+                && self.clusters_create_subgraph(cluster_one, cluster_two)
+            {
+                edge_candidates.push({
+                    PowerEdgeCandidate {
+                        from: cluster_one.get_id(),
+                        to: cluster_two.get_id(),
+                        size: node_union.len() as f32,
+                    }
+                })
+            }
+
+            if cluster_one == cluster_two && self.clusters_are_clique(cluster_one) {
+                edge_candidates.push({
+                    PowerEdgeCandidate {
+                        from: cluster_one.get_id(),
+                        to: cluster_two.get_id(),
+                        size: node_union.len() as f32 / 2_f32,
+                    }
+                })
+            }
+        }
+
+        println!("PowerEdge Candidates: {:?}", edge_candidates);
+    }
+
+    fn clusters_create_subgraph(&self, cluster_one: &Cluster, cluster_two: &Cluster) -> bool {
+        for u in cluster_one.items.iter() {
+            for w in cluster_two.items.iter() {
+                match self.get_edge(&u, &w) {
+                    Some(_edge) => continue,
+                    _ => (),
+                }
+
+                match self.get_edge(&w, &u) {
+                    Some(_edge) => continue,
+                    _ => (),
+                }
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    fn clusters_are_clique(&self, cluster_one: &Cluster) -> bool {
+        for u in cluster_one.items.iter() {
+            for w in cluster_one.items.iter() {
+                if u == w {
+                    continue;
+                }
+
+                match self.get_edge(&u, &w) {
+                    Some(_edge) => continue,
+                    _ => (),
+                }
+
+                match self.get_edge(&w, &u) {
+                    Some(_edge) => continue,
+                    _ => (),
+                }
+
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -474,5 +605,129 @@ mod tests {
 
         let mut powergraph = PowerGraph::new(nodes, edges);
         powergraph.decompose();
+    }
+
+    #[test]
+    fn clusters_create_subgraph() {
+        let nodes: Vec<Node> = vec![
+            Node::new("parent".to_string(), "foo".to_string()),
+            Node::new("child".to_string(), "bar".to_string()),
+            Node::new("sibling".to_string(), "baz".to_string()),
+            Node::new("sibling2".to_string(), "fizz".to_string()),
+            Node::new("child2".to_string(), "Boo!".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("parent", "child"),
+            Edge::new("parent", "sibling"),
+            Edge::new("parent", "sibling2"),
+            Edge::new("child", "child2"),
+        ];
+
+        let powergraph = PowerGraph::new(nodes, edges);
+        let cluster_one = Cluster::new(
+            Set::from_iter(vec!["parent".to_string()]),
+            Set::from_iter(vec![
+                "child".to_string(),
+                "sibling".to_string(),
+                "sibling2".to_string(),
+            ]),
+        );
+
+        let cluster_two = Cluster::new(
+            Set::from_iter(vec!["child".to_string()]),
+            Set::from_iter(vec!["parent".to_string(), "child2".to_string()]),
+        );
+
+        let is_subgraph = powergraph.clusters_create_subgraph(&cluster_one, &cluster_two);
+        assert!(is_subgraph);
+    }
+
+    #[test]
+    fn clusters_create_subgraph_negative_case() {
+        let nodes: Vec<Node> = vec![
+            Node::new("parent".to_string(), "foo".to_string()),
+            Node::new("child".to_string(), "bar".to_string()),
+            Node::new("sibling".to_string(), "baz".to_string()),
+            Node::new("sibling2".to_string(), "fizz".to_string()),
+            Node::new("child2".to_string(), "Boo!".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("parent", "child"),
+            Edge::new("parent", "sibling"),
+            Edge::new("parent", "sibling2"),
+            Edge::new("child", "child2"),
+        ];
+
+        let powergraph = PowerGraph::new(nodes, edges);
+        let cluster_one = Cluster::new(
+            Set::from_iter(vec!["parent".to_string()]),
+            Set::from_iter(vec![
+                "child".to_string(),
+                "sibling".to_string(),
+                "sibling2".to_string(),
+            ]),
+        );
+
+        let cluster_two = Cluster::new(
+            Set::from_iter(vec!["child2".to_string()]),
+            Set::from_iter(vec!["child".to_string()]),
+        );
+
+        let is_subgraph = powergraph.clusters_create_subgraph(&cluster_one, &cluster_two);
+        assert!(!is_subgraph);
+    }
+
+    #[test]
+    fn cluster_clique_detection() {
+        let nodes: Vec<Node> = vec![
+            Node::new("a".to_string(), "foo".to_string()),
+            Node::new("b".to_string(), "bar".to_string()),
+            Node::new("c".to_string(), "baz".to_string()),
+            Node::new("d".to_string(), "baz".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("a", "b"),
+            Edge::new("a", "c"),
+            Edge::new("b", "c"),
+            Edge::new("b", "d"),
+        ];
+
+        let powergraph = PowerGraph::new(nodes, edges);
+        let cluster_one = Cluster::new(
+            Set::from_iter(vec!["a".to_string(), "c".to_string()]),
+            Set::from_iter(vec!["b".to_string(), "a".to_string(), "c".to_string()]),
+        );
+
+        let is_subgraph = powergraph.clusters_are_clique(&cluster_one);
+        assert!(is_subgraph);
+    }
+
+    #[test]
+    fn cluster_clique_detection_negative() {
+        let nodes: Vec<Node> = vec![
+            Node::new("a".to_string(), "foo".to_string()),
+            Node::new("b".to_string(), "bar".to_string()),
+            Node::new("c".to_string(), "baz".to_string()),
+            Node::new("d".to_string(), "baz".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("a", "b"),
+            Edge::new("a", "c"),
+            Edge::new("b", "c"),
+            Edge::new("b", "d"),
+        ];
+
+        let powergraph = PowerGraph::new(nodes, edges);
+        let cluster_one = Cluster::new(
+            Set::from_iter(vec!["a".to_string(), "c".to_string(), "d".to_string()]),
+            Set::from_iter(vec!["b".to_string(), "a".to_string(), "c".to_string()]),
+        );
+
+        let is_subgraph = powergraph.clusters_are_clique(&cluster_one);
+        assert!(!is_subgraph);
     }
 }

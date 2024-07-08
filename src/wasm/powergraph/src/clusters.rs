@@ -2,21 +2,33 @@ use crate::{sets::Set, unordered_tuple::UnorderedTuple};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cluster {
-    items: Set<String>,
+    pub items: Set<String>,
     neighbors: Set<String>,
 }
 
 impl Cluster {
     pub fn new(items: Set<String>, neighbors: Set<String>) -> Cluster {
-        Cluster { items, neighbors }
+        Cluster {
+            items: items.clone(),
+            neighbors: neighbors.difference(&items),
+        }
     }
 
     /// Compute the similarity score between two Clusters. Similarity is
     /// The Jaccard index of the parent nodes for each cluster.
 
     pub fn similarity(&self, other_cluster: &Cluster) -> f32 {
-        let intersection = self.neighbors.intersection(&other_cluster.neighbors);
-        let union = self.neighbors.union(&other_cluster.neighbors);
+        let intersection = self
+            .neighbors
+            .intersection(&other_cluster.neighbors)
+            .difference(&self.items)
+            .difference(&other_cluster.items);
+
+        let union = self
+            .neighbors
+            .union(&other_cluster.neighbors)
+            .difference(&self.items)
+            .difference(&other_cluster.items);
 
         let similarity = intersection.len() as f32 / union.len() as f32;
 

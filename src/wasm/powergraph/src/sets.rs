@@ -3,6 +3,34 @@ pub struct Set<T> {
     items: Vec<T>,
 }
 
+impl<T> IntoIterator for Set<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+pub struct SetIterator<'a, T> {
+    set: &'a Set<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for SetIterator<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.set.items.len() {
+            let result = &self.set.items[self.index];
+            self.index += 1;
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
 impl<T: std::cmp::PartialEq + Clone> Set<T> {
     pub fn new() -> Set<T> {
         Set { items: Vec::new() }
@@ -70,6 +98,13 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
 
     pub fn to_vec(&self) -> Vec<T> {
         return self.items.clone();
+    }
+
+    pub fn iter(&self) -> SetIterator<T> {
+        SetIterator {
+            set: self,
+            index: 0,
+        }
     }
 }
 

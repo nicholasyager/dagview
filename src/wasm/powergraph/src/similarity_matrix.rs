@@ -49,7 +49,7 @@ impl SimilarityMatrix {
     }
 
     // Get the column and row with the largest similarity score
-    pub fn get_max_similarity(&self) -> (UnorderedTuple, f32) {
+    pub fn get_max_similarity(&self) -> Option<(UnorderedTuple, f32)> {
         let mut values: Vec<(UnorderedTuple, f32)> = self
             .matrix
             .iter()
@@ -59,7 +59,11 @@ impl SimilarityMatrix {
         values.sort_by_key(|value| (value.1 * 10000_f32) as u32);
         values.reverse();
 
-        return values[0].clone();
+        if values.len() == 0 {
+            return None;
+        }
+
+        return Some(values[0].clone());
     }
 
     pub fn len(&self) -> usize {
@@ -105,7 +109,7 @@ mod test {
         matrix.remove_element("buzz".to_string());
         assert_eq!(matrix.len(), 2);
         assert_eq!(
-            matrix.get_max_similarity(),
+            matrix.get_max_similarity().unwrap(),
             (
                 UnorderedTuple {
                     one: "foo".to_string(),
