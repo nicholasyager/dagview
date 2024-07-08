@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityMatrix {
-    matrix: HashMap<UnorderedTuple, f32>,
+    matrix: HashMap<UnorderedTuple<String>, f32>,
 }
 
 // #[wasm_bindgen]
@@ -26,7 +26,7 @@ impl SimilarityMatrix {
     pub fn remove_element(&mut self, element_id: String) {
         println!("Removing {:?} from the matrix.", element_id);
 
-        let remove_list: Vec<UnorderedTuple> = self
+        let remove_list: Vec<UnorderedTuple<String>> = self
             .matrix
             .clone()
             .into_iter()
@@ -44,13 +44,13 @@ impl SimilarityMatrix {
     }
 
     /// Set the similarity between two clusters based on their index.
-    pub fn set_similarity(&mut self, index: UnorderedTuple, similarity: f32) {
+    pub fn set_similarity(&mut self, index: UnorderedTuple<String>, similarity: f32) {
         self.matrix.insert(index, similarity);
     }
 
     // Get the column and row with the largest similarity score
-    pub fn get_max_similarity(&self) -> Option<(UnorderedTuple, f32)> {
-        let mut values: Vec<(UnorderedTuple, f32)> = self
+    pub fn get_max_similarity(&self) -> Option<(UnorderedTuple<String>, f32)> {
+        let mut values: Vec<(UnorderedTuple<String>, f32)> = self
             .matrix
             .iter()
             .map(|(index, similarity)| (index.clone(), similarity.clone()))

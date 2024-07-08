@@ -209,7 +209,8 @@ impl PowerGraph {
 
         let mut similarity_matrix = SimilarityMatrix::new();
 
-        let comparison_sets: Set<UnorderedTuple> = clusters::generate_comparison_set(&c_prime);
+        let comparison_sets: Set<UnorderedTuple<String>> =
+            clusters::generate_comparison_set(&c_prime);
 
         for comparison_set in comparison_sets.to_vec() {
             let cluster_index = c
@@ -382,7 +383,7 @@ impl PowerGraph {
 
             let singleton = PowerNode {
                 id: cluster.get_id(),
-                cluster: cluster,
+                cluster,
             };
 
             self.power_nodes.push(singleton)
@@ -391,9 +392,19 @@ impl PowerGraph {
         // Generate candidates for PowerEdges
         let mut edge_candidates: Vec<PowerEdgeCandidate> = Vec::new();
 
-        for cluster in c.into_iter().combinations(2) {
-            let cluster_one = cluster.get(0).unwrap();
-            let cluster_two = cluster.get(1).unwrap();
+        let cluster_pairs: Set<UnorderedTuple<Cluster>> = Set::from_iter(
+            c.into_iter()
+                .permutations(2)
+                .map(|cluster| UnorderedTuple {
+                    one: cluster.get(0).unwrap().clone(),
+                    two: cluster.get(1).unwrap().clone(),
+                })
+                .collect(),
+        );
+
+        for cluster_pair in cluster_pairs {
+            let cluster_one = cluster_pair.one;
+            let cluster_two = cluster_pair.two;
 
             println!(
                 "Checking {:?} and {:?} for poweredge candidates",
@@ -402,9 +413,14 @@ impl PowerGraph {
 
             let node_intersection = cluster_one.items.intersection(&cluster_two.items);
             let node_union = cluster_one.items.union(&cluster_two.items);
+            println!(" - Intersection : {:?}", node_intersection);
+            println!(
+                " - Subgraph: {:?}",
+                self.clusters_create_subgraph(&cluster_one, &cluster_two)
+            );
 
-            if node_intersection.len() > 0
-                && self.clusters_create_subgraph(cluster_one, cluster_two)
+            if node_intersection.len() == 0
+                && self.clusters_create_subgraph(&cluster_one, &cluster_two)
             {
                 edge_candidates.push({
                     PowerEdgeCandidate {
@@ -415,7 +431,7 @@ impl PowerGraph {
                 })
             }
 
-            if cluster_one == cluster_two && self.clusters_are_clique(cluster_one) {
+            if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one) {
                 edge_candidates.push({
                     PowerEdgeCandidate {
                         from: cluster_one.get_id(),
@@ -425,6 +441,9 @@ impl PowerGraph {
                 })
             }
         }
+
+        edge_candidates.sort_by_key(|item| (item.size * 10000_f32) as u32);
+        edge_candidates.reverse();
 
         println!("PowerEdge Candidates: {:?}", edge_candidates);
     }

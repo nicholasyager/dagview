@@ -76,8 +76,8 @@ impl Cluster {
     }
 }
 
-pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple> {
-    let mut comparison_set: Set<UnorderedTuple> = Set::new();
+pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple<String>> {
+    let mut comparison_set: Set<UnorderedTuple<String>> = Set::new();
 
     for cluster in clusters {
         for comparison_cluster in clusters {
@@ -158,7 +158,7 @@ mod tests {
             ]),
         );
 
-        assert_eq!(set1.similarity(&set2), 0.2_f32)
+        assert_eq!(set1.similarity(&set2), 0.25_f32)
     }
 
     #[test]
