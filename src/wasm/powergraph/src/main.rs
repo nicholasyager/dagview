@@ -29,6 +29,7 @@ fn main() {
     //     Edge::new("x", "z"),
     //     Edge::new("t", "z"),
     // ];
+    simple_logger::SimpleLogger::new().env().init().unwrap();
 
     let nodes: Vec<Node> = vec![
         Node::new("a".to_string(), "foo".to_string()),

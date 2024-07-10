@@ -46,6 +46,20 @@ impl Cluster {
         Cluster::new(unioned_items, unioned_parents)
     }
 
+    pub fn difference(self, other_cluster: &Cluster) -> Cluster {
+        let items = self.items.difference(&other_cluster.items);
+        let parents = self.neighbors.difference(&other_cluster.neighbors);
+
+        Cluster::new(items, parents)
+    }
+
+    pub fn intersection(self, other_cluster: &Cluster) -> Cluster {
+        let items = self.items.intersection(&other_cluster.items);
+        let parents = self.neighbors.intersection(&other_cluster.neighbors);
+
+        Cluster::new(items, parents)
+    }
+
     pub fn add_item(&mut self, item: String) {
         self.items.insert(item);
     }
@@ -73,6 +87,10 @@ impl Cluster {
 
     pub fn get_items(&self) -> Vec<String> {
         return self.items.to_vec();
+    }
+
+    pub fn size(&self) -> usize {
+        return self.items.len();
     }
 }
 

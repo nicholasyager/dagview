@@ -52,6 +52,7 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
         self.items.push(item);
     }
 
+    // TODO: Use a reference to T and not T itself.
     pub fn contains(&self, item: T) -> bool {
         return self.items.contains(&item);
     }
@@ -90,6 +91,14 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
         }
 
         Set::from_iter(different_items)
+    }
+
+    pub fn is_subset_of(&self, other_set: &Set<T>) -> bool {
+        return self.difference(other_set).len() == 0;
+    }
+
+    pub fn is_proper_subset_of(&self, other_set: &Set<T>) -> bool {
+        return self.difference(other_set).len() == 0 && other_set.difference(self).len() > 0;
     }
 
     pub fn len(&self) -> usize {
@@ -137,5 +146,23 @@ mod tests {
 
         let intersection = cluster_a.difference(&cluster_b);
         assert_eq!(intersection.items, vec![1]);
+    }
+
+    #[test]
+    fn set_subset_detection() {
+        let cluster_a = Set::from_iter(vec![1, 2]);
+        let cluster_b = Set::from_iter(vec![1, 2, 3, 4]);
+
+        let is_subset = cluster_a.is_subset_of(&cluster_b);
+        assert!(is_subset);
+    }
+
+    #[test]
+    fn set_subset_detection_negative() {
+        let cluster_a = Set::from_iter(vec![1, 2]);
+        let cluster_b = Set::from_iter(vec![1, 3, 4]);
+
+        let is_subset = cluster_a.is_subset_of(&cluster_b);
+        assert!(!is_subset);
     }
 }
