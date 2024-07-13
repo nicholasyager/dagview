@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use crate::{sets::Set, unordered_tuple::UnorderedTuple};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Cluster {
     pub items: Set<String>,
     neighbors: Set<String>,
