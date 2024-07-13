@@ -4,8 +4,6 @@ mod similarity_matrix;
 mod unordered_tuple;
 mod utils;
 
-use std::process::exit;
-
 use clusters::Cluster;
 use itertools::Itertools;
 use sets::Set;
@@ -13,7 +11,7 @@ use similarity_matrix::SimilarityMatrix;
 use unordered_tuple::UnorderedTuple;
 use wasm_bindgen::prelude::*;
 
-use log::{info, trace, warn};
+use log::{trace, warn};
 
 #[wasm_bindgen]
 extern "C" {
@@ -25,11 +23,11 @@ extern "C" {
     // fn log(s: &str);
 }
 
-macro_rules! console_log {
-    // Note that this is using the `log` function imported above during
-    // `bare_bones`
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
+// macro_rules! console_log {
+//     // Note that this is using the `log` function imported above during
+//     // `bare_bones`
+//     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+// }
 
 #[wasm_bindgen]
 pub fn greet(value: &str) {
@@ -122,17 +120,17 @@ impl PowerGraph {
         }
     }
 
-    fn get_node(&self, node_id: &NodeId) -> Option<Node> {
-        for node in self.nodes.iter() {
-            if node.id == *node_id {
-                return Some(node.clone());
-            }
-        }
+    // fn get_node(&self, node_id: &NodeId) -> Option<Node> {
+    //     for node in self.nodes.iter() {
+    //         if node.id == *node_id {
+    //             return Some(node.clone());
+    //         }
+    //     }
 
-        println!("Unable to find {:?} in {:?}", node_id, self.nodes);
+    //     println!("Unable to find {:?} in {:?}", node_id, self.nodes);
 
-        return None;
-    }
+    //     return None;
+    // }
 
     // Given a from index and to index, return the edge if it exists in the graph.
     fn get_edge(&self, from: &NodeId, to: &NodeId) -> Option<Edge> {
@@ -194,39 +192,39 @@ impl PowerGraph {
         return output;
     }
 
-    fn node_id_to_index(&self) {}
+    // fn node_id_to_index(&self) {}
 
-    /// For a given Cluster, find all node names for sibling nodes.
-    fn find_siblings(&self, cluster: &Cluster) -> Set<String> {
-        let mut output = Set::from_iter(Vec::new());
+    // /// For a given Cluster, find all node names for sibling nodes.
+    // fn find_siblings(&self, cluster: &Cluster) -> Set<String> {
+    //     let mut output = Set::from_iter(Vec::new());
 
-        // Find all children of parents. This will be the selected cluster's generation.
+    //     // Find all children of parents. This will be the selected cluster's generation.
 
-        for neighbor_id in cluster.get_neighbors() {
-            let neighbor = self.get_node(&neighbor_id).unwrap();
+    //     for neighbor_id in cluster.get_neighbors() {
+    //         let neighbor = self.get_node(&neighbor_id).unwrap();
 
-            let children: Vec<String> = self
-                .edges
-                .iter()
-                .filter_map(|edge| {
-                    if edge.from == neighbor.id {
-                        return Some(edge.to.clone());
-                    }
+    //         let children: Vec<String> = self
+    //             .edges
+    //             .iter()
+    //             .filter_map(|edge| {
+    //                 if edge.from == neighbor.id {
+    //                     return Some(edge.to.clone());
+    //                 }
 
-                    None
-                })
-                .collect();
+    //                 None
+    //             })
+    //             .collect();
 
-            for child in children {
-                output.insert(child);
-            }
-        }
+    //         for child in children {
+    //             output.insert(child);
+    //         }
+    //     }
 
-        let cluster_set = Set::from_iter(cluster.get_items());
+    //     let cluster_set = Set::from_iter(cluster.get_items());
 
-        // Return the list.
-        return (output.difference(&cluster_set)).clone();
-    }
+    //     // Return the list.
+    //     return (output.difference(&cluster_set)).clone();
+    // }
 
     fn neighbors(&self, node_id: &NodeId) -> Set<String> {
         let node_ids = self
@@ -248,10 +246,10 @@ impl PowerGraph {
     #[wasm_bindgen]
     pub fn decompose(&mut self) {
         let mut c: Vec<Cluster> = Vec::new();
-        let mut c_prime: Vec<Cluster> = Vec::new();
+        let mut c_prime: Vec<Cluster>;
 
         // Add all nodes to c and c_prime as singleton clusters.
-        for (index, node) in (&self.nodes).into_iter().enumerate() {
+        for node in (&self.nodes).into_iter() {
             println!("Node: {:?}", node);
             // console_log!("Node: {:?}", node);
 
@@ -460,8 +458,8 @@ impl PowerGraph {
                 .iter()
                 .permutations(2)
                 .map(|cluster| UnorderedTuple {
-                    one: cluster.get(0).unwrap().clone(),
-                    two: cluster.get(1).unwrap().clone(),
+                    one: *(cluster.get(0).unwrap()),
+                    two: *(cluster.get(1).unwrap()),
                 })
                 .collect(),
         );
@@ -556,28 +554,6 @@ impl PowerGraph {
                 })
             }
         }
-
-        // let covered_edges = self.power_edges.iter().map(|power_Edge| {
-        //     let source_power_node = self.power_nodes.po
-
-        // }).collect();
-
-        // let missing_edges: Vec<PowerEdge> = self
-        //     .edges
-        //     .clone()
-        //     .into_iter()
-        //     .filter_map(|edge| {
-        //         let possible_power_edge = PowerEdge {
-        //             from: edge.from,
-        //             to: edge.to,
-        //         };
-        //         if self.power_edges.contains(&possible_power_edge) {
-        //             return None;
-        //         }
-        //         Some(possible_power_edge)
-        //     })
-        //     .collect();
-        // self.power_edges.extend(missing_edges);
 
         println!(
             "Complete!\nPower Nodes: {:?}\n\tPower Edges: {:?}",
@@ -944,71 +920,71 @@ mod tests {
         assert_eq!(power_graph.edges.len(), 15);
     }
 
-    #[test]
-    fn find_siblings_trivial_case() {
-        let nodes: Vec<Node> = vec![
-            Node::new("parent".to_string(), "foo".to_string()),
-            Node::new("child".to_string(), "bar".to_string()),
-            Node::new("sibling".to_string(), "baz".to_string()),
-            Node::new("sibling2".to_string(), "fizz".to_string()),
-            Node::new("child2".to_string(), "Boo!".to_string()),
-        ];
+    // #[test]
+    // fn find_siblings_trivial_case() {
+    //     let nodes: Vec<Node> = vec![
+    //         Node::new("parent".to_string(), "foo".to_string()),
+    //         Node::new("child".to_string(), "bar".to_string()),
+    //         Node::new("sibling".to_string(), "baz".to_string()),
+    //         Node::new("sibling2".to_string(), "fizz".to_string()),
+    //         Node::new("child2".to_string(), "Boo!".to_string()),
+    //     ];
 
-        let edges: Vec<Edge> = vec![
-            Edge::new("parent", "child"),
-            Edge::new("parent", "sibling"),
-            Edge::new("parent", "sibling2"),
-            Edge::new("child", "child2"),
-        ];
+    //     let edges: Vec<Edge> = vec![
+    //         Edge::new("parent", "child"),
+    //         Edge::new("parent", "sibling"),
+    //         Edge::new("parent", "sibling2"),
+    //         Edge::new("child", "child2"),
+    //     ];
 
-        let powergraph = PowerGraph::new(nodes, edges);
-        let cluster = Cluster::new(
-            Set::from_iter(vec!["child".to_string()]),
-            powergraph.neighbors(&"child".to_string()),
-        );
-        let siblings = powergraph.find_siblings(&cluster);
+    //     let powergraph = PowerGraph::new(nodes, edges);
+    //     let cluster = Cluster::new(
+    //         Set::from_iter(vec!["child".to_string()]),
+    //         powergraph.neighbors(&"child".to_string()),
+    //     );
+    //     let siblings = powergraph.find_siblings(&cluster);
 
-        assert_eq!(
-            siblings,
-            Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
-        );
-    }
-
-    #[test]
-    fn find_siblings_non_trivial_case() {
-        let nodes: Vec<Node> = vec![
-            Node::new("parent1".to_string(), "foo".to_string()),
-            Node::new("parent2".to_string(), "foo".to_string()),
-            Node::new("parent3".to_string(), "foo".to_string()),
-            Node::new("child".to_string(), "bar".to_string()),
-            Node::new("sibling".to_string(), "baz".to_string()),
-            Node::new("sibling2".to_string(), "fizz".to_string()),
-            Node::new("child2".to_string(), "Boo!".to_string()),
-        ];
-
-        let edges: Vec<Edge> = vec![
-            Edge::new("parent1", "child"),
-            Edge::new("parent2", "child"),
-            Edge::new("parent3", "child"),
-            Edge::new("parent2", "sibling"),
-            Edge::new("parent3", "sibling2"),
-            Edge::new("child", "child2"),
-        ];
-
-        let powergraph = PowerGraph::new(nodes, edges);
-        let cluster = Cluster::new(
-            Set::from_iter(vec!["child".to_string()]),
-            powergraph.neighbors(&"child".to_string()),
-        );
-        let siblings = powergraph.find_siblings(&cluster);
-
-        assert_eq!(
-            siblings,
-            Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
-        );
-    }
+    //     assert_eq!(
+    //         siblings,
+    //         Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
+    //     );
+    // }
 
     // #[test]
+    // fn find_siblings_non_trivial_case() {
+    //     let nodes: Vec<Node> = vec![
+    //         Node::new("parent1".to_string(), "foo".to_string()),
+    //         Node::new("parent2".to_string(), "foo".to_string()),
+    //         Node::new("parent3".to_string(), "foo".to_string()),
+    //         Node::new("child".to_string(), "bar".to_string()),
+    //         Node::new("sibling".to_string(), "baz".to_string()),
+    //         Node::new("sibling2".to_string(), "fizz".to_string()),
+    //         Node::new("child2".to_string(), "Boo!".to_string()),
+    //     ];
+
+    //     let edges: Vec<Edge> = vec![
+    //         Edge::new("parent1", "child"),
+    //         Edge::new("parent2", "child"),
+    //         Edge::new("parent3", "child"),
+    //         Edge::new("parent2", "sibling"),
+    //         Edge::new("parent3", "sibling2"),
+    //         Edge::new("child", "child2"),
+    //     ];
+
+    //     let powergraph = PowerGraph::new(nodes, edges);
+    //     let cluster = Cluster::new(
+    //         Set::from_iter(vec!["child".to_string()]),
+    //         powergraph.neighbors(&"child".to_string()),
+    //     );
+    //     let siblings = powergraph.find_siblings(&cluster);
+
+    //     assert_eq!(
+    //         siblings,
+    //         Set::from_iter(vec!["sibling".to_string(), "sibling2".to_string()])
+    //     );
+    // }
+
+    #[test]
     fn decompose() {
         let nodes: Vec<Node> = vec![
             Node::new("1".to_string(), "foo".to_string()),
