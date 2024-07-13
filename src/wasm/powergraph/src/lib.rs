@@ -4,6 +4,8 @@ mod similarity_matrix;
 mod unordered_tuple;
 mod utils;
 
+use std::process::exit;
+
 use clusters::Cluster;
 use itertools::Itertools;
 use serde::Serialize;
@@ -12,7 +14,7 @@ use similarity_matrix::SimilarityMatrix;
 use unordered_tuple::UnorderedTuple;
 use wasm_bindgen::prelude::*;
 
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 #[wasm_bindgen]
 extern "C" {
@@ -22,6 +24,9 @@ extern "C" {
     // `log(..)`
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
+
+    #[wasm_bindgen(js_namespace = console)]
+    fn debug(s: &str);
 }
 
 macro_rules! console_log {
@@ -29,7 +34,23 @@ macro_rules! console_log {
     // `bare_bones`
     ($($t:tt)*) => {
         let value  = format_args!($($t)*).to_string();
+
+        #[cfg(target_arch = "wasm32")]
         log(&value);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        info!("{}", &value);
+    }
+}
+
+macro_rules! console_debug {
+    // Note that this is using the `log` function imported above during
+    // `bare_bones`
+    ($($t:tt)*) => {
+        let value  = format_args!($($t)*).to_string();
+        #[cfg(target_arch = "wasm32")]
+        debug(&value);
+        #[cfg(not(target_arch = "wasm32"))]
         trace!("{}", &value);
     }
 }
@@ -175,8 +196,8 @@ impl PowerGraph {
             .find_power_node(&power_edge.to, self.power_nodes.clone())
             .unwrap();
 
-        console_log!("{:?} ", power_edge);
-        console_log!("{:?} -> {:?}", source_power_node, target_power_node);
+        console_debug!("{:?} ", power_edge);
+        console_debug!("{:?} -> {:?}", source_power_node, target_power_node);
 
         let edges: Vec<Edge> = source_power_node
             .cluster
@@ -184,7 +205,7 @@ impl PowerGraph {
             .iter()
             .cartesian_product(target_power_node.cluster.items.clone())
             .map(|item| {
-                console_log!("{:?}", item);
+                console_debug!("{:?}", item);
                 return Edge::new(&item.0, &item.1);
             })
             .collect();
@@ -314,6 +335,8 @@ impl PowerGraph {
         let mut max_similarity_result = similarity_matrix.get_max_similarity();
         console_log!("{:?}", max_similarity_result);
 
+        const minimum_similarity: f32 = 0.25_f32;
+
         while c_prime.len() > 0 {
             match max_similarity_result {
                 Some(_) => (),
@@ -322,7 +345,7 @@ impl PowerGraph {
 
             let max_similarity = max_similarity_result.unwrap();
 
-            if max_similarity.1 < 0.5_f32 {
+            if max_similarity.1 < minimum_similarity {
                 break;
             }
 
@@ -341,7 +364,7 @@ impl PowerGraph {
                 .unwrap();
             let comparison_cluster = c_prime[comparison_cluster_index].clone();
 
-            console_log!("{:?} <-> {:?}", cluster, comparison_cluster);
+            console_debug!("{:?} <-> {:?}", cluster, comparison_cluster);
 
             let mut remove_list = vec![cluster_index, comparison_cluster_index];
             remove_list.sort();
@@ -386,7 +409,7 @@ impl PowerGraph {
                 );
             }
 
-            console_log!("{:?}", similarity_matrix);
+            console_debug!("{:?}", similarity_matrix);
             max_similarity_result = similarity_matrix.get_max_similarity();
         }
 
@@ -402,7 +425,7 @@ impl PowerGraph {
 
             let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
 
-            if neighbor_similarity >= 0.5 {
+            if neighbor_similarity >= minimum_similarity {
                 console_log!(
                     "The similarity between {:?} and {:?} is {:?}. Adding to `c`.",
                     cluster,
@@ -425,7 +448,7 @@ impl PowerGraph {
 
             let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
 
-            if neighbor_similarity >= 0.5 {
+            if neighbor_similarity >= minimum_similarity {
                 c.push(neighborhood_cluster);
             }
         }
@@ -452,7 +475,7 @@ impl PowerGraph {
                 continue;
             }
 
-            console_log!(
+            console_debug!(
                 "{:?} is a singleton. Adding to PowerNodes.",
                 cluster.get_id()
             );
@@ -477,10 +500,11 @@ impl PowerGraph {
 
         // console_log!("{:?} pairs of clusters identified.", cluster_pairs.len());
 
+        // TODO: This is probably an area for a performance improvement.
         for cluster_pair in self
             .clusters
             .iter()
-            .combinations(2)
+            .combinations_with_replacement(2)
             .map(|cluster| UnorderedTuple {
                 one: *(cluster.get(0).unwrap()),
                 two: *(cluster.get(1).unwrap()),
@@ -497,36 +521,56 @@ impl PowerGraph {
 
             let node_intersection = cluster_one.items.intersection(&cluster_two.items);
             let node_union = cluster_one.items.union(&cluster_two.items);
-            console_log!(" - Intersection : {:?}", node_intersection);
-            console_log!(
+            console_debug!(" - Intersection : {:?}", node_intersection);
+            console_debug!(
                 " - Subgraph: {:?}",
                 self.clusters_create_subgraph(&cluster_one, &cluster_two)
+            );
+            console_debug!(" - Self-loop: {:?}", cluster_one == cluster_two);
+            console_debug!(
+                " \t- Clique: {:?}",
+                &&self.clusters_are_clique(&cluster_one, &cluster_two)
             );
 
             if node_intersection.len() == 0
                 && self.clusters_create_subgraph(&cluster_one, &cluster_two)
             {
+                console_debug!(
+                    "There is a non-intersecting candidate between {:?} and {:?}.",
+                    cluster_one.get_id(),
+                    cluster_two.get_id()
+                );
+
+                let edges = self.subgraph(&node_union);
+
                 edge_candidates.push({
                     PowerEdgeCandidate {
                         from: cluster_one.clone(),
                         to: cluster_two.clone(),
-                        size: node_union.len() as f32,
+                        size: edges.len() as f32,
                     }
                 })
             }
 
-            if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one) {
+            if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one, &cluster_two) {
+                console_debug!(
+                    "There is a clique candidate between {:?} and {:?}.",
+                    cluster_one.get_id(),
+                    cluster_two.get_id()
+                );
+
+                let edges = self.subgraph(&node_union);
                 edge_candidates.push({
                     PowerEdgeCandidate {
                         from: cluster_one.clone(),
                         to: cluster_two.clone(),
-                        size: node_union.len() as f32 / 2_f32,
+                        size: edges.len() as f32 / 2_f32,
                     }
                 })
             }
         }
 
-        println!("PowerEdge Candidates: {:?}", edge_candidates);
+        console_log!("PowerEdge Candidates: {:?}", edge_candidates);
 
         while edge_candidates.len() > 0 {
             edge_candidates.sort_by_key(|item| (item.size * 10000_f32) as u32);
@@ -538,15 +582,15 @@ impl PowerGraph {
             for result in candidate_processor_results {
                 match result {
                     PowerEdgeCandidateProcessorOutput::NewPowerEdgeCandidate(candidate) => {
-                        println!("Power Edge Candidate found: {:?}", candidate);
+                        console_log!("Power Edge Candidate found: {:?}", candidate);
                         edge_candidates.push(candidate);
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
-                        println!("Power Node found: {:?}", power_node);
+                        console_log!("Power Node found: {:?}", power_node);
                         self.power_nodes.push(power_node);
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerEdge(power_edge) => {
-                        println!("Power Edge found: {:?}", power_edge);
+                        console_log!("Power Edge found: {:?}", power_edge);
                         self.power_edges.push(power_edge)
                     }
                 }
@@ -554,7 +598,7 @@ impl PowerGraph {
         }
 
         // For all remaining edges not yet covered by power edges, create new power edges.
-        console_log!("PowerEdges: {:?}", self.power_edges);
+        console_debug!("PowerEdges: {:?}", self.power_edges);
         let covered_edges: Vec<Edge> = self
             .power_edges
             .iter()
@@ -562,7 +606,7 @@ impl PowerGraph {
             .flatten()
             .collect();
 
-        console_log!("Covered edges: {:?}", covered_edges);
+        console_debug!("Covered edges: {:?}", covered_edges);
         for edge in &self.edges {
             if !covered_edges.contains(&edge)
                 && !covered_edges.contains(&Edge {
@@ -592,7 +636,7 @@ impl PowerGraph {
             return vec![];
         }
 
-        console_log!("Evaluating PowerEdge Candidate {:?}", edge_candidate);
+        console_debug!("Evaluating PowerEdge Candidate {:?}", edge_candidate);
 
         // Is there an existing powernode that overlaps with the source of the powernode
         // that is not a perfect superset?
@@ -612,15 +656,15 @@ impl PowerGraph {
                 .is_subset_of(&edge_candidate.from.items);
 
             if u_s_intersection.len() > 0 && !s_subset_u && !u_subset_s {
-                console_log!(
+                console_debug!(
                     "Creating a new PowerEdgeCandidate.\n\tCluster U: {:?}\n\tCluster S: {:?}",
                     edge_candidate.from,
                     power_node.cluster
                 );
 
-                console_log!("Checking intersection: {:?}.", u_s_intersection);
+                console_debug!("Checking intersection: {:?}.", u_s_intersection);
 
-                console_log!(
+                console_debug!(
                     "U - S: {:?} ",
                     edge_candidate
                         .from
@@ -628,7 +672,7 @@ impl PowerGraph {
                         .difference(&power_node.cluster.items)
                 );
 
-                console_log!(
+                console_debug!(
                     "S - U: {:?}.",
                     power_node
                         .cluster
@@ -664,7 +708,7 @@ impl PowerGraph {
                 .to
                 .items
                 .intersection(&power_node.cluster.items);
-            console_log!(
+            console_debug!(
                 "w_s_intersection with {:?}: {:?}",
                 power_node,
                 w_s_intersection
@@ -679,18 +723,18 @@ impl PowerGraph {
                 .items
                 .is_subset_of(&edge_candidate.to.items);
 
-            console_log!("s_subset_w: {:?}, w_subset_s: {:?}", s_subset_w, w_subset_s);
+            console_debug!("s_subset_w: {:?}, w_subset_s: {:?}", s_subset_w, w_subset_s);
 
             if w_s_intersection.len() > 0 && !s_subset_w && !w_subset_s {
-                console_log!(
+                console_debug!(
                     "Creating a new PowerEdgeCandidate.\n\tCluster W: {:?}\n\tCluster S: {:?}",
                     edge_candidate.to,
                     power_node.cluster
                 );
 
-                console_log!("Checking intersection: {:?}.", w_s_intersection);
+                console_debug!("Checking intersection: {:?}.", w_s_intersection);
 
-                console_log!(
+                console_debug!(
                     "U - S: {:?} ",
                     edge_candidate
                         .to
@@ -698,7 +742,7 @@ impl PowerGraph {
                         .difference(&power_node.cluster.items)
                 );
 
-                console_log!(
+                console_debug!(
                     "S - U: {:?}.",
                     power_node
                         .cluster
@@ -727,29 +771,64 @@ impl PowerGraph {
 
         let power_edge_nodes = edge_candidate.from.items.union(&edge_candidate.to.items);
 
-        let cluster_subgraph = self.subgraph(&power_edge_nodes);
+        // let cluster_subgraph = self.subgraph(&power_edge_nodes);
+
         let uncontained_edges: Vec<&Edge> = self
             .edges
             .iter()
-            .filter(|edge| !cluster_subgraph.contains(edge))
+            .filter(|edge| {
+                power_edge_nodes.contains(edge.from.clone())
+                    && power_edge_nodes.contains(edge.to.clone())
+            })
             .collect();
+
         if uncontained_edges.len() > 0 {
-            warn!("Edges not contained in powernode: {:?}", uncontained_edges);
+            warn!("Edges contained in power_edge: {:?}", uncontained_edges);
 
             let new_candidates = uncontained_edges
                 .into_iter()
                 .filter_map(|edge| {
                     warn!(
-                        "Evaluating edge {:?} not contained in powernode {:?} ",
+                        "Evaluating edge {:?} contained in powernode {:?} ",
                         edge, edge_candidate
                     );
 
                     let s = Set::from_iter(vec![edge.from.clone()]);
                     let t = Set::from_iter(vec![edge.to.clone()]);
 
+                    console_debug!(
+                        "edge containment: {:?} does not contain {:?}.",
+                        edge_candidate,
+                        edge
+                    );
+
+                    console_debug!(
+                        "edge containment: Checking if {:?} is a subset of {:?}.",
+                        edge_candidate.from.items,
+                        s
+                    );
+
+                    console_debug!(
+                        "edge containment: Checking if {:?} is a subset of {:?}.",
+                        edge_candidate.from.items,
+                        t
+                    );
+
+                    console_debug!(
+                        "edge containment: Checking if {:?} is a subset of {:?}.",
+                        edge_candidate.to.items,
+                        s
+                    );
+
+                    console_debug!(
+                        "edge containment: Checking if {:?} is a subset of {:?}.",
+                        edge_candidate.to.items,
+                        t
+                    );
+
                     if edge_candidate.from.items.is_proper_subset_of(&s) {
-                        console_log!(
-                            "Candidate edge source {:?} does not contain elements of {:?}",
+                        console_debug!(
+                            "edge containment: Candidate edge source {:?} does not contain elements of {:?}",
                             edge_candidate.from,
                             s
                         );
@@ -766,8 +845,8 @@ impl PowerGraph {
                             },
                         ));
                     } else if edge_candidate.from.items.is_proper_subset_of(&t) {
-                        console_log!(
-                            "Candidate edge source {:?} does not contain elements of {:?}",
+                        console_debug!(
+                            "edge containment: Candidate edge source {:?} does not contain elements of {:?}",
                             edge_candidate.from,
                             t
                         );
@@ -785,8 +864,8 @@ impl PowerGraph {
                             },
                         ));
                     } else if edge_candidate.to.items.is_proper_subset_of(&s) {
-                        console_log!(
-                            "Candidate edge target {:?} does not contain elements of {:?}",
+                        console_debug!(
+                            "edge containment: Candidate edge target {:?} does not contain elements of {:?}",
                             edge_candidate.to,
                             s
                         );
@@ -804,8 +883,8 @@ impl PowerGraph {
                             },
                         ));
                     } else if edge_candidate.to.items.is_proper_subset_of(&t) {
-                        console_log!(
-                            "Candidate edge target {:?} does not contain elements of {:?}",
+                        console_debug!(
+                            "edge containment: Candidate edge target {:?} does not contain elements of {:?}",
                             edge_candidate.to,
                             t
                         );
@@ -824,7 +903,7 @@ impl PowerGraph {
                         ));
                     }
 
-                    console_log!("Welp. We somehow didn't find any subsets. Is this bad?");
+                    console_debug!("edge containment: Welp. We somehow didn't find any subsets. Is this bad?");
                     None
                 })
                 .collect();
@@ -884,12 +963,12 @@ impl PowerGraph {
         return true;
     }
 
-    fn clusters_are_clique(&self, cluster_one: &Cluster) -> bool {
+    fn clusters_are_clique(&self, cluster_one: &Cluster, cluster_two: &Cluster) -> bool {
         for u in cluster_one.items.iter() {
-            for w in cluster_one.items.iter() {
-                if u == w {
-                    continue;
-                }
+            for w in cluster_two.items.iter() {
+                // if u == w {
+                //     continue;
+                // }
 
                 match self.get_edge(&u, &w) {
                     Some(_edge) => continue,
@@ -1136,7 +1215,33 @@ mod tests {
             Set::from_iter(vec!["b".to_string(), "a".to_string(), "c".to_string()]),
         );
 
-        let is_subgraph = powergraph.clusters_are_clique(&cluster_one);
+        let is_subgraph = powergraph.clusters_are_clique(&cluster_one, &cluster_one);
+        assert!(is_subgraph);
+    }
+
+    #[test]
+    fn singular_clusters_can_be_cliques() {
+        let nodes: Vec<Node> = vec![
+            Node::new("a".to_string(), "foo".to_string()),
+            Node::new("b".to_string(), "bar".to_string()),
+            Node::new("c".to_string(), "baz".to_string()),
+            Node::new("d".to_string(), "baz".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("a", "b"),
+            Edge::new("a", "c"),
+            Edge::new("b", "c"),
+            Edge::new("b", "d"),
+        ];
+
+        let powergraph = PowerGraph::new(nodes, edges);
+        let cluster_one = Cluster::new(
+            Set::from_iter(vec!["a".to_string()]),
+            Set::from_iter(vec!["b".to_string(), "c".to_string()]),
+        );
+
+        let is_subgraph = powergraph.clusters_are_clique(&cluster_one, &cluster_one);
         assert!(is_subgraph);
     }
 
@@ -1162,7 +1267,7 @@ mod tests {
             Set::from_iter(vec!["b".to_string(), "a".to_string(), "c".to_string()]),
         );
 
-        let is_subgraph = powergraph.clusters_are_clique(&cluster_one);
+        let is_subgraph = powergraph.clusters_are_clique(&cluster_one, &cluster_one);
         assert!(!is_subgraph);
     }
 
@@ -1193,5 +1298,33 @@ mod tests {
         let subgraph_edges = powergraph.subgraph(&nodes);
 
         assert!(subgraph_edges == edges);
+    }
+
+    // Does the decomposition algorithm appropriately detect bicliques?
+    #[test]
+    fn biclique_detection() {
+        let nodes: Vec<Node> = vec![
+            Node::new("source1".to_string(), "foo".to_string()),
+            Node::new("source2".to_string(), "foo".to_string()),
+            Node::new("a".to_string(), "foo".to_string()),
+            Node::new("b".to_string(), "foo".to_string()),
+            Node::new("target".to_string(), "bar".to_string()),
+        ];
+
+        let edges: Vec<Edge> = vec![
+            Edge::new("source2", "source1"),
+            Edge::new("source1", "a"),
+            Edge::new("source1", "b"),
+            Edge::new("a", "target"),
+            Edge::new("b", "target"),
+        ];
+
+        let mut powergraph = PowerGraph::new(nodes, edges);
+        powergraph.decompose();
+
+        println!("{:?}", powergraph.power_nodes);
+        println!("{:?}", powergraph.power_edges);
+
+        assert_eq!(powergraph.power_edges.len(), 0);
     }
 }

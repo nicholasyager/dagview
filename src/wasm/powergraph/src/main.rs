@@ -31,18 +31,51 @@ fn main() {
     // ];
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
+    // let nodes: Vec<Node> = vec![
+    //     Node::new("a".to_string(), "foo".to_string()),
+    //     Node::new("b".to_string(), "foo".to_string()),
+    //     Node::new("c".to_string(), "foo".to_string()),
+    //     Node::new("d".to_string(), "bar".to_string()),
+    // ];
+
+    // let edges: Vec<Edge> = vec![
+    //     Edge::new("a", "b"),
+    //     Edge::new("a", "c"),
+    //     Edge::new("b", "c"),
+    //     Edge::new("b", "d"),
+    // ];
+
+    // let nodes: Vec<Node> = vec![
+    //     Node::new("a".to_string(), "foo".to_string()),
+    //     Node::new("b".to_string(), "foo".to_string()),
+    //     Node::new("c".to_string(), "foo".to_string()),
+    //     Node::new("d".to_string(), "bar".to_string()),
+    //     Node::new("e".to_string(), "bar".to_string()),
+    // ];
+
+    // let edges: Vec<Edge> = vec![
+    //     Edge::new("a", "b"),
+    //     Edge::new("a", "c"),
+    //     Edge::new("b", "d"),
+    //     Edge::new("c", "d"),
+    //     Edge::new("d", "e"),
+    // ];
+
     let nodes: Vec<Node> = vec![
         Node::new("a".to_string(), "foo".to_string()),
         Node::new("b".to_string(), "foo".to_string()),
         Node::new("c".to_string(), "foo".to_string()),
         Node::new("d".to_string(), "bar".to_string()),
+        Node::new("e".to_string(), "bar".to_string()),
     ];
 
     let edges: Vec<Edge> = vec![
-        Edge::new("a", "b"),
         Edge::new("a", "c"),
+        Edge::new("a", "d"),
+        Edge::new("a", "e"),
         Edge::new("b", "c"),
         Edge::new("b", "d"),
+        Edge::new("b", "e"),
     ];
 
     let mut powergraph = PowerGraph::new(nodes, edges);
