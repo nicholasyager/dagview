@@ -34,10 +34,6 @@ impl Cluster {
 
         let similarity = intersection.len() as f32 / union.len() as f32;
 
-        println!(
-            "{:?} <-> {:?}: {:?} {:?} => {:?}",
-            self, other_cluster, intersection, union, similarity
-        );
         similarity
     }
 

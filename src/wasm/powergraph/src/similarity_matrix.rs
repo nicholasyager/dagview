@@ -24,7 +24,7 @@ impl SimilarityMatrix {
     // }
 
     pub fn remove_element(&mut self, element_id: String) {
-        println!("Removing {:?} from the matrix.", element_id);
+        // println!("Removing {:?} from the matrix.", element_id);
 
         let remove_list: Vec<UnorderedTuple<String>> = self
             .matrix
