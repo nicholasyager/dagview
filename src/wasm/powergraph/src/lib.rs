@@ -8,7 +8,7 @@ mod utils;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::process::exit;
+
 use std::time::Instant;
 
 use clusters::Cluster;
@@ -387,7 +387,7 @@ impl PowerGraph {
         let mut max_similarity_result = similarity_matrix.get_max_similarity();
         console_log!("{:?}", max_similarity_result);
 
-        const minimum_similarity: f32 = 0.25_f32;
+        const MINIMUM_SIMILARITY: f32 = 0.25_f32;
 
         while c_prime.len() > 0 {
             match max_similarity_result {
@@ -397,7 +397,7 @@ impl PowerGraph {
 
             let max_similarity = max_similarity_result.unwrap();
 
-            if max_similarity.1 < minimum_similarity {
+            if max_similarity.1 < MINIMUM_SIMILARITY {
                 break;
             }
 
@@ -479,7 +479,7 @@ impl PowerGraph {
 
             let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
 
-            if neighbor_similarity >= minimum_similarity {
+            if neighbor_similarity >= MINIMUM_SIMILARITY {
                 console_log!(
                     "The similarity between {:?} and {:?} is {:?}. Adding to `c`.",
                     cluster,
@@ -502,7 +502,7 @@ impl PowerGraph {
 
             let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
 
-            if neighbor_similarity >= minimum_similarity {
+            if neighbor_similarity >= MINIMUM_SIMILARITY {
                 c.push(neighborhood_cluster);
             }
         }
