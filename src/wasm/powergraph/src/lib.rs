@@ -579,23 +579,29 @@ impl PowerGraph {
             combination_count
         );
 
-        let mut time_chunk_start_time = Instant::now();
-        let mut count = 0;
-        for (index, cluster_pair) in combinations.iter().enumerate() {
-            count += 1;
+        // #[cfg(not(target_arch = "wasm32"))]
+        // {
+        //     let mut time_chunk_start_time = Instant::now();
+        //     let mut count = 0;
+        // }
+        for cluster_pair in combinations.iter() {
+            // #[cfg(not(target_arch = "wasm32"))]
+            // {
+            //     count += 1;
 
-            if time_chunk_start_time.elapsed().as_secs() >= 10 {
-                let rate = count as f32 / time_chunk_start_time.elapsed().as_secs() as f32;
-                console_log!(
-                    "Checking combination {:?} of {:?}. Speed: {:?} combinations / second. Time remaining: {:?}",
-                    index,
-                    combination_count,
-                    rate,
-                    (combination_count - index) as f32 / rate
-                );
-                time_chunk_start_time = Instant::now();
-                count = 0;
-            }
+            //     if time_chunk_start_time.elapsed().as_secs() >= 10 {
+            //         let rate = count as f32 / time_chunk_start_time.elapsed().as_secs() as f32;
+            //         console_log!(
+            //         "Checking combination {:?} of {:?}. Speed: {:?} combinations / second. Time remaining: {:?}",
+            //         index,
+            //         combination_count,
+            //         rate,
+            //         (combination_count - index) as f32 / rate
+            //     );
+            //         time_chunk_start_time = Instant::now();
+            //         count = 0;
+            //     }
+            // }
 
             let cluster_one = cluster_pair.one;
             let cluster_two = cluster_pair.two;
