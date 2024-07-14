@@ -2,10 +2,32 @@ use serde::Serialize;
 
 use crate::{sets::Set, unordered_tuple::UnorderedTuple};
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Cluster {
     pub items: Set<String>,
     neighbors: Set<String>,
+}
+
+impl std::hash::Hash for Cluster {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        self.items.hash(state);
+        self.neighbors.hash(state);
+    }
+}
+
+impl PartialEq for Cluster {
+    fn eq(&self, other: &Self) -> bool {
+        self.items == other.items && self.neighbors == other.neighbors
+    }
+}
+
+impl Eq for Cluster {
+    // fn eq(&self, other: &Self) -> bool {
+    //     self.from == other.from && self.to == other.to && self.size == other.size
+    // }
 }
 
 impl Cluster {

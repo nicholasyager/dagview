@@ -1,13 +1,18 @@
 mod clusters;
+mod edge_repository;
 mod sets;
 mod similarity_matrix;
 mod unordered_tuple;
 mod utils;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::process::exit;
+use std::time::Instant;
 
 use clusters::Cluster;
+use edge_repository::EdgeRepository;
 use itertools::Itertools;
 use serde::Serialize;
 use sets::Set;
@@ -86,10 +91,32 @@ impl Node {
 }
 
 #[wasm_bindgen]
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Edge {
     from: NodeId,
     to: NodeId,
+}
+
+impl std::hash::Hash for Edge {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        self.from.hash(state);
+        self.to.hash(state);
+    }
+}
+
+impl PartialEq for Edge {
+    fn eq(&self, other: &Self) -> bool {
+        self.from == other.from && self.to == other.to
+    }
+}
+
+impl Eq for Edge {
+    // fn eq(&self, other: &Self) -> bool {
+    //     self.from == other.from && self.to == other.to && self.size == other.size
+    // }
 }
 
 #[wasm_bindgen]
@@ -109,6 +136,10 @@ impl Edge {
     pub fn get_to(&self) -> String {
         self.to.clone()
     }
+
+    pub fn get_id(&self) -> String {
+        format!("{}-{}", self.from, self.to)
+    }
 }
 
 type PowerNodeId = String;
@@ -127,11 +158,30 @@ pub struct PowerEdge {
     to: PowerNodeId,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct PowerEdgeCandidate {
     from: Cluster,
     to: Cluster,
     size: f32,
+}
+
+impl Hash for PowerEdgeCandidate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.from.hash(state);
+        self.to.hash(state);
+    }
+}
+
+impl PartialEq for PowerEdgeCandidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.from == other.from && self.to == other.to && self.size == other.size
+    }
+}
+
+impl Eq for PowerEdgeCandidate {
+    // fn eq(&self, other: &Self) -> bool {
+    //     self.from == other.from && self.to == other.to && self.size == other.size
+    // }
 }
 
 #[derive(Debug)]
@@ -145,7 +195,7 @@ enum PowerEdgeCandidateProcessorOutput {
 #[derive(Serialize)]
 pub struct PowerGraph {
     nodes: Vec<Node>,
-    edges: Vec<Edge>,
+    edges: EdgeRepository,
     power_nodes: Vec<PowerNode>,
     power_edges: Vec<PowerEdge>,
     clusters: Vec<Cluster>,
@@ -157,9 +207,11 @@ impl PowerGraph {
     pub fn new(nodes: Vec<Node>, edges: Vec<Edge>) -> PowerGraph {
         // console::log_1(&"Hello using web-sys".into());
 
+        let edge_repository = EdgeRepository::from_edge_list(edges);
+
         PowerGraph {
             nodes,
-            edges,
+            edges: edge_repository,
             power_edges: Vec::new(),
             power_nodes: Vec::new(),
             clusters: Vec::new(),
@@ -171,26 +223,9 @@ impl PowerGraph {
         serde_wasm_bindgen::to_value(self).unwrap()
     }
 
-    // fn get_node(&self, node_id: &NodeId) -> Option<Node> {
-    //     for node in self.nodes.iter() {
-    //         if node.id == *node_id {
-    //             return Some(node.clone());
-    //         }
-    //     }
-
-    //     println!("Unable to find {:?} in {:?}", node_id, self.nodes);
-
-    //     return None;
-    // }
-
     // Given a from index and to index, return the edge if it exists in the graph.
     fn get_edge(&self, from: &NodeId, to: &NodeId) -> Option<Edge> {
-        for edge in self.edges.iter() {
-            if edge.from == *from && edge.to == *to {
-                return Some(edge.clone());
-            }
-        }
-        None
+        self.edges.get_edge(from, to)
     }
 
     fn find_power_node(&self, search_id: &str, power_nodes: Vec<PowerNode>) -> Option<PowerNode> {
@@ -215,12 +250,12 @@ impl PowerGraph {
 
         console_debug!("{:?} ", power_edge);
         console_debug!("{:?} -> {:?}", source_power_node, target_power_node);
-
+        let target_items: Vec<String> = target_power_node.cluster.items.into_iter().collect();
         let edges: Vec<Edge> = source_power_node
             .cluster
             .items
             .iter()
-            .cartesian_product(target_power_node.cluster.items.clone())
+            .cartesian_product(target_items.into_iter())
             .map(|item| {
                 console_debug!("{:?}", item);
                 return Edge::new(&item.0, &item.1);
@@ -232,81 +267,18 @@ impl PowerGraph {
 
     /// For a given set of nodes, return all edges between the nodes.
     fn subgraph(&self, nodes: &Set<NodeId>) -> Vec<Edge> {
-        let mut output = Vec::new();
-
-        for edge in self.edges.iter() {
-            if nodes.contains(edge.from.clone()) && nodes.contains(edge.to.clone()) {
-                output.push(edge.clone());
-            }
-        }
-
-        return output;
+        self.edges.subgraph(nodes)
     }
 
-    // fn node_id_to_index(&self) {}
-
-    // /// For a given Cluster, find all node names for sibling nodes.
-    // fn find_siblings(&self, cluster: &Cluster) -> Set<String> {
-    //     let mut output = Set::from_iter(Vec::new());
-
-    //     // Find all children of parents. This will be the selected cluster's generation.
-
-    //     for neighbor_id in cluster.get_neighbors() {
-    //         let neighbor = self.get_node(&neighbor_id).unwrap();
-
-    //         let children: Vec<String> = self
-    //             .edges
-    //             .iter()
-    //             .filter_map(|edge| {
-    //                 if edge.from == neighbor.id {
-    //                     return Some(edge.to.clone());
-    //                 }
-
-    //                 None
-    //             })
-    //             .collect();
-
-    //         for child in children {
-    //             output.insert(child);
-    //         }
-    //     }
-
-    //     let cluster_set = Set::from_iter(cluster.get_items());
-
-    //     // Return the list.
-    //     return (output.difference(&cluster_set)).clone();
-    // }
-
     fn neighbors(&self, node_id: &NodeId) -> Set<String> {
-        let node_ids = self
-            .edges
-            .iter()
-            .filter_map(|edge| {
-                if edge.from == *node_id {
-                    return Some(edge.to.clone());
-                } else if edge.to == *node_id {
-                    return Some(edge.from.clone());
-                }
-                None
-            })
-            .collect();
+        let parents = self.edges.parents(node_id);
+        let children = self.edges.children(node_id);
 
-        Set::from_iter(node_ids)
+        parents.union(&children)
     }
 
     fn predecessors(&self, node_id: &NodeId) -> Set<String> {
-        let node_ids = self
-            .edges
-            .iter()
-            .filter_map(|edge| {
-                if edge.from == *node_id {
-                    return Some(edge.to.clone());
-                }
-                None
-            })
-            .collect();
-
-        Set::from_iter(node_ids)
+        self.edges.parents(node_id)
     }
 
     /// Use graph topology to identify cluster pairs for comparison.
@@ -591,7 +563,7 @@ impl PowerGraph {
         // TODO: This is probably an area for a performance improvement.
         // for cluster_pair in self.generate_graph_comparison_set(&self.clusters) {
         console_log!("Checking cluster pairs for poweredge candidates");
-        for cluster_pair in self
+        let combinations: Vec<UnorderedTuple<&Cluster>> = self
             .clusters
             .iter()
             .combinations_with_replacement(2)
@@ -599,34 +571,43 @@ impl PowerGraph {
                 one: *(cluster.get(0).unwrap()),
                 two: *(cluster.get(1).unwrap()),
             })
-        {
+            .collect();
+
+        let combination_count = combinations.len();
+        console_log!(
+            "{:?} combinations for power edge candidates found. Evaluating.",
+            combination_count
+        );
+
+        let mut time_chunk_start_time = Instant::now();
+        let mut count = 0;
+        for (index, cluster_pair) in combinations.iter().enumerate() {
+            count += 1;
+
+            if time_chunk_start_time.elapsed().as_secs() >= 10 {
+                let rate = count as f32 / time_chunk_start_time.elapsed().as_secs() as f32;
+                console_log!(
+                    "Checking combination {:?} of {:?}. Speed: {:?} combinations / second. Time remaining: {:?}",
+                    index,
+                    combination_count,
+                    rate,
+                    (combination_count - index) as f32 / rate
+                );
+                time_chunk_start_time = Instant::now();
+                count = 0;
+            }
+
             let cluster_one = cluster_pair.one;
             let cluster_two = cluster_pair.two;
 
-            // console_log!(
-            //     "Checking {:?} and {:?} for poweredge candidates",
-            //     cluster_one,
-            //     cluster_two
-            // );
-
             let node_intersection = cluster_one.items.intersection(&cluster_two.items);
             let node_union = cluster_one.items.union(&cluster_two.items);
-            // console_debug!(" - Intersection : {:?}", node_intersection);
-            // console_debug!(
-            //     " - Subgraph: {:?}",
-            //     self.clusters_create_subgraph(&cluster_one, &cluster_two)
-            // );
-            // console_debug!(" - Self-loop: {:?}", cluster_one == cluster_two);
-            // console_debug!(
-            //     " \t- Clique: {:?}",
-            //     &&self.clusters_are_clique(&cluster_one, &cluster_two)
-            // );
 
             if node_intersection.len() == 0
                 && self.clusters_create_subgraph(&cluster_one, &cluster_two)
             {
                 console_debug!(
-                    "There is a non-intersecting candidate between {:?} and {:?}.",
+                    "  a non-intersecting candidate between {:?} and {:?}.",
                     cluster_one.get_id(),
                     cluster_two.get_id()
                 );
@@ -662,6 +643,8 @@ impl PowerGraph {
 
         console_log!("PowerEdge Candidates: {:?}", edge_candidates);
 
+        let mut completed_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
+
         while edge_candidates.len() > 0 {
             edge_candidates.sort_by_key(|item| (item.size * 10000_f32) as u32);
 
@@ -674,11 +657,18 @@ impl PowerGraph {
                 match result {
                     PowerEdgeCandidateProcessorOutput::NewPowerEdgeCandidate(candidate) => {
                         console_log!("Power Edge Candidate found: {:?}", candidate);
+
+                        // Don't process the same edge candidate twice.
+                        if completed_candidates.contains(&candidate) {
+                            return;
+                        }
+
                         cluster_map.insert(candidate.from.get_id(), candidate.from.clone());
                         cluster_map.insert(candidate.to.get_id(), candidate.to.clone());
                         if !edge_candidates.contains(&candidate) {
-                            edge_candidates.push(candidate);
+                            edge_candidates.push(candidate.clone());
                         }
+                        completed_candidates.insert(candidate.clone());
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
                         console_log!("Power Node found: {:?}", power_node);
@@ -706,7 +696,7 @@ impl PowerGraph {
             .collect();
 
         console_debug!("Covered edges: {:?}", covered_edges);
-        for edge in &self.edges {
+        for edge in self.edges.clone().into_iter() {
             if !covered_edges.contains(&edge)
                 && !covered_edges.contains(&Edge {
                     from: edge.to.clone(),
@@ -993,8 +983,8 @@ impl PowerGraph {
                         )];
                     }
                 }
-                return vec![];
             }
+            return vec![];
         }
 
         if edge_candidate.to == edge_candidate.from {

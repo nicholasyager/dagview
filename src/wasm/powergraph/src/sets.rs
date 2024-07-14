@@ -1,41 +1,57 @@
+use itertools::Itertools;
 use serde::Serialize;
+use std::collections::HashSet;
+use std::hash::Hash;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Set<T> {
-    items: Vec<T>,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Set<T: std::cmp::PartialEq + std::hash::Hash + std::cmp::Eq> {
+    items: HashSet<T>,
 }
 
-impl<T> IntoIterator for Set<T> {
+impl<T: Hash + Eq> IntoIterator for Set<T> {
     type Item = T;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::collections::hash_set::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
     }
 }
 
-pub struct SetIterator<'a, T> {
-    set: &'a Set<T>,
+impl<T: Eq + Hash + Ord> std::hash::Hash for Set<T> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        self.items.iter().sorted().for_each(|item| {
+            item.hash(state);
+        })
+    }
+}
+
+pub struct SetIterator<T: Hash + Eq> {
+    set: Vec<T>,
     index: usize,
 }
 
-impl<'a, T> Iterator for SetIterator<'a, T> {
-    type Item = &'a T;
+impl<'a, T: Hash + Eq + Clone> Iterator for SetIterator<T> {
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.set.items.len() {
-            let result = &self.set.items[self.index];
+        if self.index < self.set.len() {
+            let result = &self.set[self.index].clone();
             self.index += 1;
-            Some(result)
+            Some(result.clone())
         } else {
             None
         }
     }
 }
 
-impl<T: std::cmp::PartialEq + Clone> Set<T> {
+impl<T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
     pub fn new() -> Set<T> {
-        Set { items: Vec::new() }
+        Set {
+            items: HashSet::new(),
+        }
     }
 
     pub fn from_iter(items: Vec<T>) -> Set<T> {
@@ -47,11 +63,12 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
         return new_set;
     }
 
+    pub fn from_set(items: HashSet<T>) -> Set<T> {
+        return Set { items };
+    }
+
     pub fn insert(&mut self, item: T) {
-        if self.contains(item.clone()) {
-            return;
-        }
-        self.items.push(item);
+        self.items.insert(item);
     }
 
     // TODO: Use a reference to T and not T itself.
@@ -60,39 +77,33 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
     }
 
     pub fn intersection(&self, other_cluster: &Set<T>) -> Set<T> {
-        let mut common_items = Vec::new();
-
-        for item in &self.items {
-            if other_cluster.items.iter().any(|i| i == item) {
-                common_items.push(item.clone())
-            }
-        }
-
-        Set::from_iter(common_items)
+        return Set {
+            items: self
+                .items
+                .intersection(&other_cluster.items)
+                .map(|item| item.clone())
+                .collect(),
+        };
     }
 
     pub fn union(&self, other_cluster: &Set<T>) -> Set<T> {
-        let mut all_items = self.items.clone();
-
-        for item in &other_cluster.items {
-            if !all_items.iter().any(|i| i == item) {
-                all_items.push(item.clone())
-            }
+        Set {
+            items: self
+                .items
+                .union(&other_cluster.items)
+                .map(|item| item.clone())
+                .collect(),
         }
-
-        Set::from_iter(all_items)
     }
 
     pub fn difference(&self, other_cluster: &Set<T>) -> Set<T> {
-        let mut different_items = Vec::new();
-
-        for item in &self.items {
-            if !other_cluster.items.iter().any(|i| i == item) {
-                different_items.push(item.clone())
-            }
+        Set {
+            items: self
+                .items
+                .difference(&other_cluster.items)
+                .map(|item| item.clone())
+                .collect(),
         }
-
-        Set::from_iter(different_items)
     }
 
     pub fn is_subset_of(&self, other_set: &Set<T>) -> bool {
@@ -108,14 +119,16 @@ impl<T: std::cmp::PartialEq + Clone> Set<T> {
     }
 
     pub fn to_vec(&self) -> Vec<T> {
-        return self.items.clone();
+        return self.items.clone().into_iter().collect::<Vec<T>>();
     }
 
     pub fn iter(&self) -> SetIterator<T> {
-        SetIterator {
-            set: self,
+        let list = self.items.clone().into_iter().collect::<Vec<T>>();
+        let iterator = SetIterator {
+            set: list.clone(),
             index: 0,
-        }
+        };
+        return iterator;
     }
 }
 
@@ -129,7 +142,9 @@ mod tests {
         let cluster_b = Set::from_iter(vec![2, 3, 4]);
 
         let intersection = cluster_a.intersection(&cluster_b);
-        assert_eq!(intersection.items, vec![2]);
+        let mut answer_set = HashSet::new();
+        answer_set.insert(2);
+        assert_eq!(intersection.items, answer_set);
     }
 
     #[test]
@@ -138,7 +153,12 @@ mod tests {
         let cluster_b = Set::from_iter(vec![2, 3, 4]);
 
         let intersection = cluster_a.union(&cluster_b);
-        assert_eq!(intersection.items, vec![1, 2, 3, 4]);
+        let mut answer_set = HashSet::new();
+        answer_set.insert(1);
+        answer_set.insert(2);
+        answer_set.insert(3);
+        answer_set.insert(4);
+        assert_eq!(intersection.items, answer_set);
     }
 
     #[test]
@@ -147,7 +167,10 @@ mod tests {
         let cluster_b = Set::from_iter(vec![2, 3, 4]);
 
         let intersection = cluster_a.difference(&cluster_b);
-        assert_eq!(intersection.items, vec![1]);
+
+        let mut answer_set = HashSet::new();
+        answer_set.insert(1);
+        assert_eq!(intersection.items, answer_set);
     }
 
     #[test]

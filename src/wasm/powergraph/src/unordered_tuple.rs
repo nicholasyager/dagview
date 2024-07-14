@@ -1,7 +1,22 @@
-#[derive(Debug, Clone, Hash)]
+use itertools::Itertools;
+
+#[derive(Debug, Clone)]
 pub struct UnorderedTuple<T> {
     pub one: T,
     pub two: T,
+}
+
+impl<T: std::hash::Hash + Ord + Clone> std::hash::Hash for UnorderedTuple<T> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        let items: Vec<&T> = vec![&self.one, &self.two];
+
+        for item in items.iter().sorted() {
+            item.hash(state);
+        }
+    }
 }
 
 impl<T: PartialEq> PartialEq for UnorderedTuple<T> {

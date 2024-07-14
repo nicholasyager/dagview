@@ -20,7 +20,7 @@ struct Manifest {
 fn main() {
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
-    let f = File::open("manifest.big.json").unwrap();
+    let f = File::open("manifest.huge.json").unwrap();
     let reader = BufReader::new(f);
 
     let v: Manifest = serde_json::from_reader(reader).unwrap();
