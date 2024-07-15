@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::Serialize;
 
 use crate::{sets::Set, unordered_tuple::UnorderedTuple};
@@ -32,9 +34,11 @@ impl Eq for Cluster {
 
 impl Cluster {
     pub fn new(items: Set<String>, neighbors: Set<String>) -> Cluster {
+        let neighbor_items = neighbors.difference(&items).to_owned();
+
         Cluster {
             items: items.clone(),
-            neighbors: neighbors.difference(&items),
+            neighbors: neighbor_items,
         }
     }
 
@@ -42,19 +46,27 @@ impl Cluster {
     /// The Jaccard index of the parent nodes for each cluster.
 
     pub fn similarity(&self, other_cluster: &Cluster) -> f32 {
-        let intersection = self
-            .neighbors
-            .intersection(&other_cluster.neighbors)
-            .difference(&self.items)
-            .difference(&other_cluster.items);
+        let source_nodes: HashSet<&String> =
+            self.items.items.union(&other_cluster.items.items).collect();
 
-        let union = self
+        let intersection: HashSet<&String> = self
             .neighbors
-            .union(&other_cluster.neighbors)
-            .difference(&self.items)
-            .difference(&other_cluster.items);
+            .items
+            .intersection(&other_cluster.neighbors.items)
+            .collect::<HashSet<&String>>();
 
-        let similarity = intersection.len() as f32 / union.len() as f32;
+        let intersection_less_source: HashSet<&&String> =
+            intersection.difference(&source_nodes).collect();
+
+        let union: HashSet<&String> = self
+            .neighbors
+            .items
+            .union(&other_cluster.neighbors.items)
+            .collect::<HashSet<&String>>();
+
+        let union_less_source: HashSet<&&String> = union.difference(&source_nodes).collect();
+
+        let similarity = intersection_less_source.len() as f32 / union_less_source.len() as f32;
 
         similarity
     }
@@ -70,7 +82,10 @@ impl Cluster {
         let items = self.items.difference(&other_cluster.items);
         let parents = self.neighbors.difference(&other_cluster.neighbors);
 
-        Cluster::new(items, parents)
+        Cluster::new(
+            Set::from_set(items.iter().map(|i| i.clone()).collect()),
+            Set::from_set(parents.iter().map(|i| i.clone()).collect()),
+        )
     }
 
     pub fn intersection(self, other_cluster: &Cluster) -> Cluster {

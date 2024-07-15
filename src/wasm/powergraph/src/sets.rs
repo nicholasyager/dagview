@@ -5,7 +5,7 @@ use std::hash::Hash;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Set<T: std::cmp::PartialEq + std::hash::Hash + std::cmp::Eq> {
-    items: HashSet<T>,
+    pub items: HashSet<T>,
 }
 
 impl<T: Hash + Eq> IntoIterator for Set<T> {
@@ -47,7 +47,19 @@ impl<'a, T: Hash + Eq + Clone> Iterator for SetIterator<T> {
     }
 }
 
-impl<T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
+impl<'a, T: std::cmp::PartialEq + Clone + Hash + Eq> Set<&T> {
+    pub fn to_owned(&'a self) -> Set<T> {
+        Set::from_set(
+            self.items
+                .clone()
+                .into_iter()
+                .map(|item| item.clone())
+                .collect(),
+        )
+    }
+}
+
+impl<'a, T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
     pub fn new() -> Set<T> {
         Set {
             items: HashSet::new(),
@@ -96,13 +108,10 @@ impl<T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
         }
     }
 
-    pub fn difference(&self, other_cluster: &Set<T>) -> Set<T> {
+    pub fn difference(&'a self, other_cluster: &'a Set<T>) -> Set<&'a T> {
         Set {
-            items: self
-                .items
-                .difference(&other_cluster.items)
-                .map(|item| item.clone())
-                .collect(),
+            items: self.items.difference(&other_cluster.items).collect(), // .map(|item| item.clone())
+                                                                          // .collect(),
         }
     }
 
@@ -179,7 +188,7 @@ mod tests {
         let intersection = cluster_a.difference(&cluster_b);
 
         let mut answer_set = HashSet::new();
-        answer_set.insert(1);
+        answer_set.insert(&1);
         assert_eq!(intersection.items, answer_set);
     }
 
