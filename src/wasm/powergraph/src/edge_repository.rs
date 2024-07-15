@@ -79,31 +79,26 @@ impl EdgeRepository {
     }
 
     pub fn subgraph(&self, nodes: &Set<String>) -> Vec<Edge> {
-        let mut output: Vec<Edge> = Vec::new();
+        let source_nodes: HashSet<&String> = self
+            .child_map
+            .keys()
+            .filter(|key| nodes.contains(key.to_string()))
+            .collect();
 
-        let source_keys =
-            Set::from_iter(self.child_map.clone().into_keys().collect::<Vec<String>>());
-
-        let source_nodes = source_keys.intersection(nodes);
-
-        for source in source_nodes.iter() {
-            let targets = self.child_map.get(&source);
-
-            match targets {
-                None => continue,
-                Some(target_set) => {
-                    let common_targets = Set::from_set(target_set.clone()).intersection(nodes);
-                    for target in common_targets {
-                        output.push(Edge {
-                            from: source.clone(),
-                            to: target,
-                        })
-                    }
-                }
-            }
-        }
-
-        return output;
+        source_nodes
+            .into_iter()
+            .filter_map(|source_node| match self.child_map.get(source_node) {
+                Some(source) => return Some((source_node, source)),
+                None => return None,
+            })
+            .flat_map(|(source, target_set)| {
+                let common_targets = Set::from_set(target_set.clone()).intersection(nodes);
+                common_targets.iter().map(|target| Edge {
+                    from: source.to_string(),
+                    to: target,
+                })
+            })
+            .collect()
     }
 
     pub fn parents(&self, node: &String) -> Set<String> {
