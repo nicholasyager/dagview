@@ -3,6 +3,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, process::exit};
 use powergraph::{Edge, Node, PowerGraph};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+// use wasm_bindgen_test::console_log;
 
 #[derive(Serialize, Deserialize)]
 struct ManifestNode {
@@ -36,9 +37,11 @@ fn main() {
     let mut edges: Vec<Edge> = v
         .child_map
         .iter()
+        .filter(|(id, _)| !id.starts_with("test"))
         .flat_map(|(parent, children)| {
             children
                 .into_iter()
+                .filter(|id| !id.starts_with("test"))
                 .map(|child| Edge::new(parent, child))
                 .collect::<Vec<Edge>>()
         })
@@ -47,9 +50,11 @@ fn main() {
     let parent_map_edges: Vec<Edge> = v
         .parent_map
         .iter()
+        .filter(|(id, _)| !id.starts_with("test"))
         .flat_map(|(child, parents)| {
             parents
                 .into_iter()
+                .filter(|id| !id.starts_with("test"))
                 .map(|parent| Edge::new(parent, child))
                 .collect::<Vec<Edge>>()
         })
@@ -57,10 +62,10 @@ fn main() {
 
     edges.extend(parent_map_edges);
 
-    edges = edges
-        .into_iter()
-        .filter(|edge| !edge.get_from().starts_with("test.") && !edge.get_to().starts_with("test."))
-        .collect();
+    // edges = edges
+    //     .into_iter()
+    //     .filter(|edge| !edge.get_from().starts_with("test.") && !edge.get_to().starts_with("test."))
+    //     .collect();
 
     // let nodes: Vec<Node> = vec![
     //     Node::new("u".to_string(), "foo".to_string()),

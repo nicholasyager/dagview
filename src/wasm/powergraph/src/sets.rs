@@ -106,6 +106,16 @@ impl<T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
         }
     }
 
+    pub fn symmetric_difference(&self, other_cluster: &Set<T>) -> Set<T> {
+        Set {
+            items: self
+                .items
+                .difference(&other_cluster.items)
+                .map(|item| item.clone())
+                .collect(),
+        }
+    }
+
     pub fn is_subset_of(&self, other_set: &Set<T>) -> bool {
         return self.difference(other_set).len() == 0;
     }

@@ -1,3 +1,4 @@
+mod cluster_repository;
 mod clusters;
 mod edge_repository;
 mod sets;
@@ -9,8 +10,10 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use std::process::exit;
 use std::time::Instant;
 
+use cluster_repository::ClusterRepository;
 use clusters::Cluster;
 use edge_repository::EdgeRepository;
 use itertools::Itertools;
@@ -323,8 +326,9 @@ impl PowerGraph {
 
     #[wasm_bindgen]
     pub fn decompose(&mut self) {
-        let mut c: Vec<Cluster> = Vec::new();
-        let mut c_prime: Vec<Cluster>;
+        let mut cluster_repository = ClusterRepository::new();
+
+        // let mut c: Vec<Cluster> = Vec::new();
 
         // Add all nodes to c and c_prime as singleton clusters.
         console_log!("Identify singleton clusters.");
@@ -343,30 +347,27 @@ impl PowerGraph {
                 ),
             );
 
-            c.push(cluster_nodes);
+            cluster_repository.add_cluster(&cluster_nodes);
         }
-        c_prime = c.clone();
+        let mut c_prime = cluster_repository.clone();
 
         console_log!(
             "Singleton cluster identification complete. Found {:?} clusters.",
-            c.len()
+            cluster_repository.len()
         );
 
         let mut similarity_matrix = SimilarityMatrix::new();
 
         let comparison_sets =
             // clusters::generate_comparison_set(&c_prime);
-            self.generate_graph_comparison_set(&c_prime);
+            self.generate_graph_comparison_set(&c_prime.clone().clusters.into_values().collect());
 
         console_log!(
             "Identified {:?} sets of clusters for comparison.",
             comparison_sets.len()
         );
 
-        let mut cluster_map: HashMap<String, Cluster> = HashMap::new();
-        for cluster in c.clone().into_iter() {
-            cluster_map.insert(cluster.get_id().clone(), cluster.clone());
-        }
+        let mut cluster_map: HashMap<String, Cluster> = cluster_repository.clusters.clone();
 
         for comparison_set in comparison_sets.to_vec() {
             let cluster = comparison_set.one;
@@ -410,22 +411,8 @@ impl PowerGraph {
 
             // console_debug!("{:?} <-> {:?}", cluster, comparison_cluster);
 
-            let mut remove_list = vec![
-                c_prime
-                    .iter()
-                    .position(|item| item.get_id() == cluster.get_id())
-                    .unwrap(),
-                c_prime
-                    .iter()
-                    .position(|item| item.get_id() == comparison_cluster.get_id())
-                    .unwrap(),
-            ];
-            remove_list.sort();
-            remove_list.reverse();
-
-            for item in remove_list {
-                c_prime.remove(item);
-            }
+            c_prime.remove(&cluster.get_id());
+            c_prime.remove(&comparison_cluster.get_id());
 
             similarity_matrix.remove_element(cluster.get_id());
             similarity_matrix.remove_element(comparison_cluster.get_id());
@@ -433,26 +420,20 @@ impl PowerGraph {
             let unioned_cluster = cluster.clone().union(&comparison_cluster);
 
             // Add new cluster to everything!
-            c.push(unioned_cluster.clone());
-            c_prime.push(unioned_cluster.clone());
+            cluster_repository.add_cluster(&unioned_cluster);
+            c_prime.add_cluster(&unioned_cluster);
             cluster_map.insert(unioned_cluster.get_id(), unioned_cluster.clone());
 
             // Calculate new similarities for the added element.
-            let cluster_parents = Set::from_iter(unioned_cluster.get_neighbors());
-            for comparison_cluster in c_prime.iter() {
+
+            // let cluster_parents = Set::from_iter(unioned_cluster.get_neighbors());
+            for comparison_cluster in c_prime.get_sibling_clusters(&unioned_cluster).iter() {
                 if unioned_cluster == *comparison_cluster {
                     continue;
                 }
 
-                let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_neighbors());
+                // let comparison_cluster_parents = Set::from_iter(comparison_cluster.get_neighbors());
 
-                if cluster_parents
-                    .intersection(&comparison_cluster_parents)
-                    .len()
-                    == 0
-                {
-                    continue;
-                }
                 let similarity = unioned_cluster.similarity(&comparison_cluster);
                 similarity_matrix.set_similarity(
                     UnorderedTuple {
@@ -469,7 +450,7 @@ impl PowerGraph {
 
         // Add first and second order neighborhoods as clusters in `c`.
 
-        for cluster in c.clone() {
+        for cluster in cluster_repository.clusters.clone().into_values() {
             let items = cluster.get_neighbors();
             let neighbors = items
                 .iter()
@@ -487,12 +468,12 @@ impl PowerGraph {
                     neighbor_similarity
                 );
 
-                c.push(neighborhood_cluster);
+                cluster_repository.add_cluster(&neighborhood_cluster);
             }
         }
 
         // Do it again for second-order neighbors.
-        for cluster in c.clone() {
+        for cluster in cluster_repository.clusters.clone().into_values() {
             let items = cluster.get_neighbors();
             let neighbors = items
                 .iter()
@@ -503,34 +484,11 @@ impl PowerGraph {
             let neighbor_similarity = cluster.similarity(&neighborhood_cluster);
 
             if neighbor_similarity >= MINIMUM_SIMILARITY {
-                c.push(neighborhood_cluster);
+                cluster_repository.add_cluster(&neighborhood_cluster);
             }
         }
 
-        // Deduplicate everything
-        let mut processed_indices: Vec<String> = vec![];
-        let mut deduped_c: Vec<Cluster> = vec![];
-        for item in c {
-            if processed_indices.contains(&item.get_id()) {
-                continue;
-            }
-
-            deduped_c.push(item.clone());
-            processed_indices.push(item.get_id());
-        }
-
-        self.clusters = deduped_c;
-
-        let mut cluster_map: HashMap<String, Cluster> = HashMap::new();
-
-        self.clusters.iter().for_each(|cluster| {
-            cluster_map.insert(cluster.get_id(), cluster.clone());
-        });
-
-        console_log!("Complete set of clusters: {:?}.", self.clusters);
-
-        // Add singletons to the powergraph
-        for cluster in self.clusters.clone().into_iter() {
+        for cluster in cluster_repository.clusters.clone().into_values() {
             if cluster.get_items().len() > 1 {
                 continue;
             }
@@ -563,9 +521,9 @@ impl PowerGraph {
         // TODO: This is probably an area for a performance improvement.
         // for cluster_pair in self.generate_graph_comparison_set(&self.clusters) {
         console_log!("Checking cluster pairs for poweredge candidates");
-        let combinations: Vec<UnorderedTuple<&Cluster>> = self
+        let combinations: Vec<UnorderedTuple<&Cluster>> = cluster_repository
             .clusters
-            .iter()
+            .values()
             .combinations_with_replacement(2)
             .map(|cluster| UnorderedTuple {
                 one: *(cluster.get(0).unwrap()),
@@ -657,7 +615,7 @@ impl PowerGraph {
             let edge_candidate = edge_candidates.pop().unwrap();
 
             let candidate_processor_results =
-                self.process_edge_candidate(&edge_candidate, &cluster_map);
+                self.process_edge_candidate(&edge_candidate, &cluster_repository);
 
             for result in candidate_processor_results {
                 match result {
@@ -666,11 +624,17 @@ impl PowerGraph {
 
                         // Don't process the same edge candidate twice.
                         if completed_candidates.contains(&candidate) {
-                            return;
+                            continue;
                         }
 
-                        cluster_map.insert(candidate.from.get_id(), candidate.from.clone());
-                        cluster_map.insert(candidate.to.get_id(), candidate.to.clone());
+                        // Don't process invalid edges
+                        if candidate.from.get_id() == "" || candidate.to.get_id() == "" {
+                            continue;
+                        }
+
+                        cluster_repository.add_cluster(&candidate.from);
+                        cluster_repository.add_cluster(&candidate.to);
+
                         if !edge_candidates.contains(&candidate) {
                             edge_candidates.push(candidate.clone());
                         }
@@ -678,7 +642,7 @@ impl PowerGraph {
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
                         console_log!("Power Node found: {:?}", power_node);
-                        cluster_map.insert(power_node.cluster.get_id(), power_node.cluster.clone());
+                        cluster_repository.add_cluster(&power_node.cluster);
 
                         self.power_nodes.push(power_node);
                     }
@@ -726,7 +690,7 @@ impl PowerGraph {
     fn process_edge_candidate(
         &self,
         edge_candidate: &PowerEdgeCandidate,
-        cluster_map: &HashMap<String, Cluster>,
+        cluster_repository: &ClusterRepository,
     ) -> Vec<PowerEdgeCandidateProcessorOutput> {
         if edge_candidate.size <= 2.0 && edge_candidate.from == edge_candidate.to {
             return vec![];
@@ -813,11 +777,11 @@ impl PowerGraph {
             let s_subset_w = edge_candidate
                 .to
                 .items
-                .is_subset_of(&power_node.cluster.items);
+                .is_proper_subset_of(&power_node.cluster.items);
             let w_subset_s = power_node
                 .cluster
                 .items
-                .is_subset_of(&edge_candidate.to.items);
+                .is_proper_subset_of(&edge_candidate.to.items);
 
             // console_debug!("s_subset_w: {:?}, w_subset_s: {:?}", s_subset_w, w_subset_s);
 
@@ -871,18 +835,16 @@ impl PowerGraph {
             .power_edges
             .iter()
             .filter(|power_edge| {
-                let s = match cluster_map.get(&power_edge.from){
+                let s = match cluster_repository.get(&power_edge.from){
                     Some(cluster) => cluster,
                     None => {
                         panic!("Attempted to load the cluster {:?}, from the cluster map, but it was not found. Skipping check.", power_edge.from);
-                        return false
                     }
                 };
-                let t = match cluster_map.get(&power_edge.to){
+                let t = match cluster_repository.get(&power_edge.to){
                     Some(cluster) => cluster,
                     None => {
                         panic!("Attempted to load the cluster {:?}, from the cluster map, but it was not found. Skipping check.", power_edge.to);
-                        return false
                     }
                 };
 
@@ -905,8 +867,8 @@ impl PowerGraph {
             for power_edge in overlapping_power_edges {
                 // If (S, T) covers not all edges of (U, W): ((U × W) ⊄ (S × T)):
 
-                let s = cluster_map.get(&power_edge.from).unwrap();
-                let t = cluster_map.get(&power_edge.to).unwrap();
+                let s = cluster_repository.get(&power_edge.from).unwrap();
+                let t = cluster_repository.get(&power_edge.to).unwrap();
 
                 let candidate_union = edge_candidate.from.clone().union(&edge_candidate.to);
                 let comparison_union = s.clone().union(&t);
@@ -1377,7 +1339,7 @@ mod tests {
 
         let subgraph_edges = powergraph.subgraph(&nodes);
 
-        assert!(subgraph_edges == edges);
+        assert!(Set::from_iter(subgraph_edges) == Set::from_iter(edges));
     }
 
     // Does the decomposition algorithm appropriately detect bicliques?
@@ -1407,6 +1369,8 @@ mod tests {
         println!("{:?}", powergraph.power_edges);
 
         assert_eq!(powergraph.power_edges.len(), 1);
-        assert_eq!(powergraph.power_edges[0].from, "c-d-e");
+        assert!(
+            powergraph.power_edges[0].from == "c-d-e" || powergraph.power_edges[0].to == "c-d-e"
+        );
     }
 }

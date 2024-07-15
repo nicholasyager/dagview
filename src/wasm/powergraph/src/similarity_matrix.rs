@@ -1,69 +1,63 @@
+use itertools::Itertools;
+
 use crate::unordered_tuple::UnorderedTuple;
 use std::collections::HashMap;
 
 // #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityMatrix {
-    matrix: HashMap<UnorderedTuple<String>, f32>,
+    matrix: Vec<(UnorderedTuple<String>, f32)>,
 }
 
 // #[wasm_bindgen]
 impl SimilarityMatrix {
     pub fn new() -> SimilarityMatrix {
-        let matrix = HashMap::new();
+        let matrix = Vec::new();
 
         SimilarityMatrix {
             matrix, // active_clusters,
         }
     }
 
-    /// Start tracking another element. Add A new row and column to
-    /// the matrix, and add the index to the cluster_index map.
-    // pub fn add_element(&mut self, element_id: &String) {
-    //     self.matrix.insert(element_id.clone(), HashMap::new());
-    // }
-
     pub fn remove_element(&mut self, element_id: String) {
         // println!("Removing {:?} from the matrix.", element_id);
 
-        let remove_list: Vec<UnorderedTuple<String>> = self
+        for index in self
             .matrix
-            .clone()
-            .into_iter()
-            .filter_map(|(key, _)| {
-                if key.one == element_id || key.two == element_id {
-                    return Some(key);
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| {
+                if item.0.one == element_id || item.0.two == element_id {
+                    return Some(index);
                 }
                 None
             })
-            .collect();
-
-        for key in remove_list {
-            self.matrix.remove(&key);
+            .sorted()
+            .rev()
+        {
+            self.matrix.remove(index);
         }
     }
 
     /// Set the similarity between two clusters based on their index.
     pub fn set_similarity(&mut self, index: UnorderedTuple<String>, similarity: f32) {
-        self.matrix.insert(index, similarity);
+        // self.matrix.insert(index, similarity);
+        match self.matrix.binary_search_by(|value| value.0.cmp(&index)) {
+            Ok(pos) => self.matrix[pos] = (index, similarity),
+            Err(_) => {
+                let pos = self.matrix.partition_point(|value| value.1 > similarity);
+                self.matrix.insert(pos, (index, similarity));
+            }
+        }
     }
 
     // Get the column and row with the largest similarity score
     pub fn get_max_similarity(&self) -> Option<(UnorderedTuple<String>, f32)> {
-        let mut values: Vec<(UnorderedTuple<String>, f32)> = self
-            .matrix
-            .iter()
-            .map(|(index, similarity)| (index.clone(), similarity.clone()))
-            .collect();
-
-        values.sort_by_key(|value| (value.1 * 10000_f32) as u32);
-        values.reverse();
-
-        if values.len() == 0 {
+        if self.matrix.len() == 0 {
             return None;
         }
 
-        return Some(values[0].clone());
+        return Some(self.matrix[0].clone());
     }
 
     pub fn len(&self) -> usize {
