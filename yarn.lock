@@ -1259,6 +1259,7 @@ __metadata:
     ngraph.forcelayout: ^3.3.1
     ngraph.graph: ^20.0.1
     ngraph.pagerank: ^2.1.1
+    ngraph.path: ^1.5.0
     path: ^0.12.7
     prettier: 2.8.8
     sass: ^1.69.0
@@ -2111,6 +2112,13 @@ __metadata:
   bin:
     pagrank: bin/pagerank.js
   checksum: c7c04bd063bcd1d2abb674340ef300329300bb57226888eed940954e6044b657d8376a3d6879fab80e934ba97ad2a468e058be7adb13a481e70add7508803d21
+  languageName: node
+  linkType: hard
+
+"ngraph.path@npm:^1.5.0":
+  version: 1.5.0
+  resolution: "ngraph.path@npm:1.5.0"
+  checksum: cc7e3b4520ba10882bf4f44c643b0021e6f8763068f111f3ac420aca565bcf588aa82ba8382a913e05bc7f3948618c6703b25ce22c65e77665eb8732a1f99e99
   languageName: node
   linkType: hard
 

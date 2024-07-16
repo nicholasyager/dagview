@@ -1,19 +1,25 @@
-use std::{collections::HashMap, fs::File, io::BufReader, process::exit};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, BufWriter},
+};
 
 use powergraph::{Edge, Node, PowerGraph};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 // use wasm_bindgen_test::console_log;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct ManifestNode {
     unique_id: String,
     resource_type: String,
+    meta: Value,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Manifest {
     nodes: HashMap<String, ManifestNode>,
+    sources: HashMap<String, ManifestNode>,
     child_map: HashMap<String, Vec<String>>,
     parent_map: HashMap<String, Vec<String>>,
 }
@@ -26,11 +32,18 @@ fn main() {
 
     let v: Manifest = serde_json::from_reader(reader).unwrap();
 
-    let nodes: Vec<Node> = v
-        .nodes
+    let mut all_nodes = v.nodes;
+    all_nodes.extend(v.sources);
+
+    let nodes: Vec<Node> = all_nodes
         .into_iter()
         .filter(|(_, node)| node.resource_type != "test")
-        .map(|(_, node)| Node::new(node.unique_id, "".to_string()))
+        .map(|(_, node)| {
+            Node::new(
+                node.clone().unique_id,
+                serde_json::to_string(&node).unwrap(),
+            )
+        })
         .collect();
     // println!("{:?}", v["nodes"]);
 
@@ -145,4 +158,10 @@ fn main() {
 
     let mut powergraph = PowerGraph::new(nodes, edges);
     powergraph.decompose();
+
+    // Serialize it to a JSON string. and write it to a file.
+
+    let output = File::create("powergraph.manifest.huge.json").unwrap();
+    let mut writer = BufWriter::new(output);
+    let _ = serde_json::to_writer(writer, &powergraph);
 }

@@ -22,16 +22,16 @@ export class GraphNode extends THREE.Mesh {
     color: THREE.Color,
     statistics: GraphNodeStatistics
   ) {
+    console.log(nodeData);
     let geometry = undefined;
-    if (
-      nodeData.resource_type == 'model' ||
-      nodeData.resource_type == 'seed' ||
-      nodeData.resource_type == 'snapshot'
-    ) {
-      geometry = new THREE.SphereGeometry(radius);
-    } else {
+    if (nodeData.resource_type == 'cluster') {
+      geometry = new THREE.SphereGeometry(0.1);
+      color = new THREE.Color(0xffffff);
+    } else if (nodeData.resource_type == 'source') {
       geometry = new THREE.ConeGeometry(radius, radius);
       color = new THREE.Color(0xffffff);
+    } else {
+      geometry = new THREE.SphereGeometry(radius);
     }
 
     const material = new THREE.MeshPhysicalMaterial({
@@ -49,6 +49,10 @@ export class GraphNode extends THREE.Mesh {
 
     this.uniqueId = uniqueId;
     this.nodeData = nodeData;
+
+    if (nodeData.resource_type == 'cluster') {
+      this.visible = false;
+    }
   }
 
   select() {

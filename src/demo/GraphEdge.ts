@@ -45,17 +45,13 @@ export class GraphEdge2 extends THREE.Group {
   particleColor: THREE.Color;
   endpointVisible: boolean;
 
-  constructor(
-    name: string,
-    source: GraphNode,
-    target: GraphNode,
-    color: THREE.Color
-  ) {
+  constructor(name: string, objectPath: GraphNode[], color: THREE.Color) {
+    let source = objectPath[0];
+    let target = objectPath[objectPath.length - 1];
     // console.log(color);
-    const curve = new THREE.CatmullRomCurve3([
-      source.position,
-      target.position,
-    ]);
+    const curve = new THREE.CatmullRomCurve3(
+      objectPath.map((item) => item.position)
+    );
 
     const particleCount = source.position.distanceTo(target.position); // Adjust the number of particles as desired
     const points = curve.getSpacedPoints(particleCount);
@@ -145,7 +141,7 @@ export class GraphEdge2 extends THREE.Group {
 
     const minOpacity = 0.05; // Fully transparent
 
-    const minLineOpacity = 0.1;
+    const minLineOpacity = 0.11;
     const maxLineOpacity = 0.5;
 
     let lineOpacity = this.calculateLineOpacity(distance, distanceArrays, [

@@ -386,7 +386,7 @@ impl PowerGraph {
 
         // Find the two clusters with maximum similarity
         let mut max_similarity_result = similarity_matrix.get_max_similarity();
-        console_log!("{:?}", max_similarity_result);
+        console_debug!("{:?}", max_similarity_result);
 
         const MINIMUM_SIMILARITY: f32 = 0.25_f32;
 
@@ -570,11 +570,11 @@ impl PowerGraph {
             if node_intersection.len() == 0
                 && self.clusters_create_subgraph(&cluster_one, &cluster_two)
             {
-                console_debug!(
-                    "  a non-intersecting candidate between {:?} and {:?}.",
-                    cluster_one.get_id(),
-                    cluster_two.get_id()
-                );
+                // console_debug!(
+                //     "  a non-intersecting candidate between {:?} and {:?}.",
+                //     cluster_one.get_id(),
+                //     cluster_two.get_id()
+                // );
 
                 let edges = self.subgraph(&node_union);
 
@@ -588,11 +588,11 @@ impl PowerGraph {
             }
 
             if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one, &cluster_two) {
-                console_debug!(
-                    "There is a clique candidate between {:?} and {:?}.",
-                    cluster_one.get_id(),
-                    cluster_two.get_id()
-                );
+                // console_debug!(
+                //     "There is a clique candidate between {:?} and {:?}.",
+                //     cluster_one.get_id(),
+                //     cluster_two.get_id()
+                // );
 
                 let edges = self.subgraph(&node_union);
                 edge_candidates.push({
@@ -605,7 +605,7 @@ impl PowerGraph {
             }
         }
 
-        console_log!("PowerEdge Candidates: {:?}", edge_candidates);
+        // console_debug!("PowerEdge Candidates: {:?}", edge_candidates);
 
         let mut completed_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
 
@@ -620,7 +620,7 @@ impl PowerGraph {
             for result in candidate_processor_results {
                 match result {
                     PowerEdgeCandidateProcessorOutput::NewPowerEdgeCandidate(candidate) => {
-                        console_log!("Power Edge Candidate found: {:?}", candidate);
+                        // console_log!("Power Edge Candidate found: {:?}", candidate);
 
                         // Don't process the same edge candidate twice.
                         if completed_candidates.contains(&candidate) {
@@ -641,13 +641,13 @@ impl PowerGraph {
                         completed_candidates.insert(candidate.clone());
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
-                        console_log!("Power Node found: {:?}", power_node);
+                        // console_log!("Power Node found: {:?}", power_node);
                         cluster_repository.add_cluster(&power_node.cluster);
 
                         self.power_nodes.push(power_node);
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerEdge(power_edge) => {
-                        console_log!("Power Edge found: {:?}", power_edge);
+                        // console_log!("Power Edge found: {:?}", power_edge);
 
                         self.power_edges.push(power_edge)
                     }

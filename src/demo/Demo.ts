@@ -3,20 +3,26 @@ import * as THREE from 'three';
 
 import { Experience } from '../engine/Experience';
 import { Resource } from '../engine/Resources';
-import { Manifest } from '../client/local';
+import {
+  JsonPowerGraph,
+  Manifest,
+  PowerEdgeObject,
+  PowerNodeObject,
+} from '../client/local';
 import { GraphNode } from './GraphNode';
 
 import createLayout, { Layout } from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
 
 import createGraph, { Graph } from 'ngraph.graph';
+import path from 'ngraph.path';
 import { EventedType } from 'ngraph.events';
 import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
 // import { PowerGraph } from './PowerGraph';
-import init, { greet, PowerGraph, Node, Edge } from 'powergraph';
+// import init, { greet, PowerGraph, Node, Edge } from 'powergraph';
 
 const MAX_ENERGY = 0.1;
 
@@ -42,8 +48,15 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      // path: 'assets/manifest.huge.json',
-      path: 'assets/manifest.big.json',
+      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.big.json',
+      // path: 'assets/manifest.small.json',
+    },
+    {
+      name: 'powergraph',
+      type: 'powergraph',
+      path: 'assets/powergraph.manifest.huge.json',
+      // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
   ];
@@ -69,161 +82,218 @@ export class Demo implements Experience {
     this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) => {});
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
+    let pg_object: JsonPowerGraph = this.engine.resources.getItem('powergraph');
 
-    const graph = this.generateGraphFromManifest(manifest);
+    const manifestGraph = this.generateGraphFromManifest(manifest);
 
     // const powerGraph = new PowerGraph(baseGraph);
 
     // const graph = powerGraph.hypergraph.graph;
 
-    init().then(() => {
-      console.log('init wasm-pack');
-      // greet('from vite!');
+    console.log(pg_object);
 
-      let nodes: Node[] = [];
-      graph.forEachNode((node) => {
-        nodes.push(Node.new(node.id as string, ''));
-      });
+    // return;
 
-      let edges: Edge[] = [];
-      graph.forEachLink((link) => {
-        edges.push(Edge.new(link.fromId as string, link.toId as string));
-      });
+    let graph = createGraph();
+    pg_object.power_nodes.forEach((node: PowerNodeObject) => {
+      let graphNode = manifestGraph.getNode(node.id);
 
-      console.log(nodes);
-      console.log(edges);
+      let nodeData = !!graphNode ? graphNode.data : {};
 
-      const powerGraph = new PowerGraph(nodes, edges);
-      powerGraph.decompose();
-
-      const pg_object = powerGraph.to_object();
-      console.log(pg_object);
-
-      return;
-
-      const layout = createLayout(graph, {
-        dimensions: 3,
-        // dragCoefficient: 0.99,
-        springLength: 0.05,
-        gravity: -6,
-      });
-
-      var energyHistory = [];
-      while (true) {
-        layout.step();
-
-        energyHistory.push(layout.getForceVectorLength());
-
-        let evaluationRange = energyHistory.slice(
-          energyHistory.length -
-            (energyHistory.length > 5 ? 5 : energyHistory.length)
-        );
-        let latestEnergyChange = evaluationRange
-          .slice(1)
-          .map((value, index) => value - evaluationRange[index]);
-        // const percentChange = (endingEnergy - startingEnergy) / startingEnergy
-
-        let meanForceDiff =
-          latestEnergyChange.reduce((acc, value) => acc + value, 0) /
-          latestEnergyChange.length;
-
-        console.log({
-          event: 'Layout',
-          step: energyHistory.length,
-          forceVector: energyHistory[energyHistory.length - 1],
-          forceDiff: meanForceDiff,
-          // forcePercent: Math.abs(percentChange),
-        });
-
-        if (Math.abs(meanForceDiff) < MAX_ENERGY) {
-          break;
-        }
+      if (node.cluster.items.items.length > 1) {
+        nodeData['resource_type'] = 'cluster';
       }
 
-      var directedBetweenness: { [key: string]: number } =
-        centrality.betweenness(graph, true);
-      var degree: { [key: string]: number } = centrality.degree(graph);
-      const sizeInterpolator = generateInterpolator(
-        [1, Math.max(...Object.values(degree))],
-        [0.2, 1]
-      );
+      graph.addNode(node.id, {
+        unique_id: node.id,
 
-      const maxBetweenness = Math.max(...Object.values(directedBetweenness));
-
-      const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
-
-      // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
-      let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-
-      graph.forEachNode((node) => {
-        let position = layout.getNodePosition(node.id);
-        console.log({ node, position });
-
-        if (!node.data) {
-          console.log(node);
-          return;
-        }
-
-        node.data['owner'] = undefined;
-        node.data['schema'];
-        let metadata = node.data['meta'] || {};
-        if (metadata.hasOwnProperty('atlan')) {
-          node.data['owner'] =
-            metadata['atlan']['attributes']['ownerGroups'][0];
-        }
-
-        let color = colorScale(node.data['owner']);
-
-        let graphNode = new GraphNode(
-          node.data.unique_id,
-          node.data,
-          interpolator(directedBetweenness[node.id]) *
-            sizeInterpolator(degree[node.id]),
-          new THREE.Color(color),
-          {
-            betweenness: directedBetweenness[node.id],
-            degree: degree[node.id],
-          }
-        );
-
-        graphNode.castShadow = false;
-
-        graphNode.position.set(
-          position.x,
-          position.y,
-          position.z ? position.z : 0
-        );
-
-        this.nodes[node.id] = graphNode;
-
-        this.engine.scene.add(graphNode);
+        ...nodeData,
       });
 
-      graph.forEachLink((link) => {
-        let sourceNode = graph.getNode(link.fromId);
-        let targetNode = graph.getNode(link.toId);
+      node.cluster.items.items.forEach((target: string) => {
+        if (node.id == target) return;
 
-        if (!sourceNode || !targetNode) return;
+        let graphNode = manifestGraph.getNode(node.id);
 
-        let sourceObject = this.nodes[sourceNode.id];
-        let targetObject = this.nodes[targetNode.id];
+        let nodeData = !!graphNode ? graphNode.data : {};
 
-        if (!sourceObject || !targetObject) return;
+        graph.addNode(target, {
+          unique_id: target,
+          ...nodeData,
+        });
 
-        let graphEdge = new GraphEdge2(
-          link.id,
-          sourceObject,
-          targetObject,
-          new THREE.Color(
-            sourceNode.data['resource_type'] == 'source'
-              ? 0xaaaaaa
-              : colorScale(sourceNode.data['owner'])
-          )
-        );
-        this.edges[link.id] = graphEdge;
-        this.engine.scene.add(graphEdge);
+        graph.addLink(node.id, target);
       });
     });
+
+    pg_object.power_edges.forEach((edge: PowerEdgeObject) => {
+      if (edge.from == edge.to) return;
+      graph.addLink(edge.from, edge.to);
+    });
+
+    const layout = createLayout(graph, {
+      dimensions: 3,
+      // dragCoefficient: 0.99,
+      springLength: 0.05,
+      gravity: -6,
+    });
+
+    var energyHistory = [];
+    while (true) {
+      layout.step();
+
+      energyHistory.push(layout.getForceVectorLength());
+
+      let evaluationRange = energyHistory.slice(
+        energyHistory.length -
+          (energyHistory.length > 5 ? 5 : energyHistory.length)
+      );
+      let latestEnergyChange = evaluationRange
+        .slice(1)
+        .map((value, index) => value - evaluationRange[index]);
+      // const percentChange = (endingEnergy - startingEnergy) / startingEnergy
+
+      let meanForceDiff =
+        latestEnergyChange.reduce((acc, value) => acc + value, 0) /
+        latestEnergyChange.length;
+
+      console.log({
+        event: 'Layout',
+        step: energyHistory.length,
+        forceVector: energyHistory[energyHistory.length - 1],
+        forceDiff: meanForceDiff,
+        // forcePercent: Math.abs(percentChange),
+      });
+
+      if (Math.abs(meanForceDiff) < MAX_ENERGY) {
+        break;
+      }
+    }
+
+    let pathFinder = path.aStar(graph);
+
+    var directedBetweenness: { [key: string]: number } = centrality.betweenness(
+      graph,
+      true
+    );
+    var degree: { [key: string]: number } = centrality.degree(graph);
+    const sizeInterpolator = generateInterpolator(
+      [1, Math.max(...Object.values(degree))],
+      [0.2, 1]
+    );
+
+    const maxBetweenness = Math.max(...Object.values(directedBetweenness));
+
+    const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
+
+    // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
+    let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+    graph.forEachNode((node) => {
+      let position = layout.getNodePosition(node.id);
+      console.log({ node, position });
+
+      if (!node.data) {
+        node.data = {};
+      }
+
+      node.data['owner'] = undefined;
+      node.data['schema'];
+      let metadata = node.data['meta'] || {};
+      if (metadata.hasOwnProperty('atlan')) {
+        node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
+      }
+
+      let color = colorScale(node.data['owner']);
+
+      let graphNode = new GraphNode(
+        node.data.unique_id,
+        node.data,
+        interpolator(directedBetweenness[node.id]) *
+          sizeInterpolator(degree[node.id]),
+        new THREE.Color(color),
+        {
+          betweenness: directedBetweenness[node.id],
+          degree: degree[node.id],
+        }
+      );
+
+      graphNode.castShadow = false;
+
+      graphNode.position.set(
+        position.x,
+        position.y,
+        position.z ? position.z : 0
+      );
+
+      this.nodes[node.id] = graphNode;
+
+      this.engine.scene.add(graphNode);
+    });
+
+    manifestGraph.forEachLink((link) => {
+      // We need to map the manifest graph to the power graph. With this in mind, we need to compute pathing
+      // in the power graph between the two ends of the manifest graph link.
+      let sourceNode = graph.getNode(link.fromId);
+
+      if (!sourceNode) {
+        return;
+      }
+
+      let targetNode = graph.getNode(link.toId);
+
+      let routingPath = pathFinder.find(link.fromId, link.toId);
+      let pathObjects = routingPath
+        .map((node) => {
+          return this.nodes[node.id];
+        })
+        .toReversed();
+
+      routingPath.map((item) => {
+        if (!this.nodes.hasOwnProperty(item.id)) {
+          console.error('Nodes is missing the item ' + item.id, item);
+        }
+      });
+
+      // console.log(link, routingPath, pathObjects);
+
+      let graphEdge = new GraphEdge2(
+        link.id,
+        pathObjects,
+        new THREE.Color(
+          sourceNode.data['resource_type'] == 'source'
+            ? 0xaaaaaa
+            : colorScale(sourceNode.data['owner'])
+        )
+      );
+      this.edges[link.id] = graphEdge;
+      this.engine.scene.add(graphEdge);
+    });
+
+    //   graph.forEachLink((link) => {
+    //     let sourceNode = graph.getNode(link.fromId);
+    //     let targetNode = graph.getNode(link.toId);
+
+    //     if (!sourceNode || !targetNode) return;
+
+    //     let sourceObject = this.nodes[sourceNode.id];
+    //     let targetObject = this.nodes[targetNode.id];
+
+    //     if (!sourceObject || !targetObject) return;
+
+    //     let graphEdge = new GraphEdge2(
+    //       link.id,
+    //       sourceObject,
+    //       targetObject,
+    //       new THREE.Color(
+    //         sourceNode.data['resource_type'] == 'source'
+    //           ? 0xaaaaaa
+    //           : colorScale(sourceNode.data['owner'])
+    //       )
+    //     );
+    //     this.edges[link.id] = graphEdge;
+    //     this.engine.scene.add(graphEdge);
+    //   });
   }
 
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
