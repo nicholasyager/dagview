@@ -1,17 +1,8 @@
-import createGraph, { Graph } from 'ngraph.graph';
+import createGraph, { Graph, Node } from 'ngraph.graph';
 import { SimilarityMatrix } from './powerGraphs/SimilarityMatrix';
-import { Cluster } from './powerGraphs/Cluster';
+import { Cluster, difference, intersection } from './powerGraphs/Cluster';
 
-type ElementType<A> = A extends ReadonlyArray<infer T> ? T : never;
-
-type ElementsOfAll<
-  Inputs,
-  R extends ReadonlyArray<unknown> = []
-> = Inputs extends readonly [infer F, ...infer M]
-  ? ElementsOfAll<M, [...R, ElementType<F>]>
-  : R;
-
-type CartesianProduct<Inputs> = ElementsOfAll<Inputs>[];
+type CartesianProduct<Inputs> = [string, string];
 
 function cartesianProduct<Sets extends ReadonlyArray<ReadonlyArray<unknown>>>(
   sets: Sets
@@ -33,15 +24,55 @@ class PowerEdge {
   }
 }
 
+class HyperGraph {
+  graph: Graph;
+  nodeParents: { [key: string]: string };
+
+  constructor() {
+    this.graph = createGraph();
+    this.nodeParents = {};
+  }
+
+  addNode(nodeId: string, data?: object) {
+    this.graph.addNode(nodeId, data);
+  }
+
+  addEdge(from: string, to: string, data?: object) {
+    this.graph.addLink(from, to, data);
+  }
+
+  addPowerNode(id: string, nodes: Set<string>, data?: object) {
+    this.graph.addNode(id, data);
+
+    nodes.forEach((node) => {
+      this.nodeParents[node] = id;
+    });
+  }
+
+  forEachNode(func: Function) {
+    this.graph.forEachNode(
+      func as (node: Node<any>) => boolean | void | null | undefined
+    );
+  }
+
+  getNodesCount() {
+    return this.graph.getNodesCount();
+  }
+}
+
 export class PowerGraph {
   graph: Graph;
-  hypergraph: Graph;
+  hypergraph: HyperGraph;
   powerEdges: Set<PowerEdge>;
   clusters: { [key: string]: Cluster };
   remainingClusters: { [key: string]: Cluster };
   minimumSimilarity: number;
 
   similarityMatrix: SimilarityMatrix;
+
+  getClusterPeers(): [Cluster, Cluster][] {
+    return [];
+  }
 
   getClusterPairs(): [Cluster, Cluster][] {
     return Object.values(this.clusters).flatMap((cluster, index) =>
@@ -51,6 +82,24 @@ export class PowerGraph {
           return [cluster, nextCluster] as [Cluster, Cluster];
         })
     );
+  }
+
+  parents(nodes: Set<string>): Set<string> {
+    // Find the parent nodes for a set of nodes.
+    let parents: Set<string> = new Set();
+
+    nodes.forEach((node) => {
+      console.log(node);
+      const links = this.graph.getLinks(node);
+      if (!links) return;
+
+      Array.from(links).forEach((link) => {
+        if (link.fromId == node) return;
+        parents.add(link.fromId as string);
+      });
+    });
+
+    return parents;
   }
 
   neighborhood(cluster: Cluster): Set<string> {
@@ -97,16 +146,29 @@ export class PowerGraph {
 
   constructor(graph: Graph) {
     this.graph = graph;
-    this.hypergraph = createGraph();
+    this.hypergraph = new HyperGraph();
     this.powerEdges = new Set<PowerEdge>();
     this.clusters = {};
     this.remainingClusters = {};
     this.minimumSimilarity = 0.9;
 
     this.graph.forEachNode((node) => {
-      if (!node.id) return;
+      if (!node || !node.id) return;
 
-      let cluster = new Cluster([node.id as string]);
+      let nodeId = node.id;
+
+      let parents: string[] = [];
+
+      const links = this.graph.getLinks(nodeId);
+      if (links == null) return;
+
+      links.forEach((item) => {
+        if (item.toId == node.id) {
+          parents.push(item.fromId as string);
+        }
+      });
+
+      let cluster = new Cluster([node.id as string], parents);
 
       this.clusters[cluster.getId()] = cluster;
       this.remainingClusters[cluster.getId()] = cluster;
@@ -193,7 +255,8 @@ export class PowerGraph {
     // For each Cluster in this.clusters, find the neighborhood and add it if the similarity
     // between the Cluster and the Neighborhood is less than the minimum similarity threshold.
     Object.entries(this.clusters).forEach(([index, cluster]) => {
-      const neighborhood = new Cluster(this.neighborhood(cluster));
+      const neighbors = this.neighborhood(cluster);
+      const neighborhood = new Cluster(neighbors, this.parents(neighbors));
       const similarity = this.calculateNeighborhoodSimilarity(
         cluster,
         neighborhood
@@ -216,7 +279,8 @@ export class PowerGraph {
     // For each Cluster in this.clusters, find the neighborhood and add it if the similarity
     // between the Cluster and the Neighborhood is less than the minimum similarity threshold.
     Object.entries(this.clusters).forEach(([index, cluster]) => {
-      const neighborhood = new Cluster(this.neighborhood(cluster));
+      const neighbors = this.neighborhood(cluster);
+      const neighborhood = new Cluster(neighbors, this.parents(neighbors));
       const similarity = this.calculateNeighborhoodSimilarity(
         cluster,
         neighborhood
@@ -238,8 +302,12 @@ export class PowerGraph {
     // Start populating the hypergraph. We'll begin by adding all singleton clusters as vertices in the hypergraph.
     Object.values(this.clusters).forEach((cluster) => {
       if (cluster.size() > 1) return;
-      console.log(cluster.getId());
-      this.hypergraph.addNode(Array.from(cluster.items)[0]);
+      const node = this.graph.getNode(cluster.getId());
+
+      this.hypergraph.addNode(cluster.getId(), {
+        cluster: cluster,
+        dbt: node?.data,
+      });
     });
 
     // Line 17 - 23: For each unordered pair of clusters, identify poweredges
@@ -329,9 +397,156 @@ export class PowerGraph {
       }
     });
 
+    // Sort power edges
+    let iterations = 0;
+    while (this.powerEdges.size > 0 && iterations < 100000) {
+      const edges = Array.from(this.powerEdges).sort((a, b) => a.size - b.size);
+
+      console.log(edges);
+      const edge = edges.pop();
+      if (!!edge) this.powerEdges.delete(edge);
+      console.log(edge);
+
+      if (!edge) continue;
+
+      const sourceCluster = this.clusters[edge.from];
+      const targetCluster = this.clusters[edge.to];
+
+      // If the size of power edge (U, W) is two and U = W then do nothing
+      if (edge?.from == edge?.to && edge?.size == 2) continue;
+      else if (null) {
+        // Add new candidates for non-trivial overlap with source
+      } else if (null) {
+        // Add new candidates for non-trivial overlap with target
+      } else if (null) {
+        // Else if (U, W) is a clique (U = W):  Add power node U to V′ and power edge (U, U) to E′
+      } else {
+        // Else: Add power nodes U and W to V′ and power edge (U, W) to E
+        console.log(
+          'Adding ' + sourceCluster.getId() + ' and ' + targetCluster.getId()
+        );
+
+        let sourceGraphNode = this.graph.getNode(sourceCluster.getId());
+        console.log(sourceGraphNode);
+        this.hypergraph.addPowerNode(
+          sourceCluster.getId(),
+          sourceCluster.items,
+          {
+            type: 'cluster',
+            cluster: sourceCluster,
+            dbt: sourceGraphNode
+              ? sourceGraphNode.data
+              : { unique_id: sourceCluster.getId() },
+          }
+        );
+
+        let targetGraphNode = this.graph.getNode(targetCluster.getId());
+        this.hypergraph.addPowerNode(
+          targetCluster.getId(),
+          targetCluster.items,
+          {
+            type: 'cluster',
+            cluster: targetCluster,
+            dbt: targetGraphNode
+              ? targetGraphNode.data
+              : { unique_id: targetCluster.getId() },
+          }
+        );
+
+        this.hypergraph.addEdge(sourceCluster.getId(), targetCluster.getId());
+      }
+
+      // For each
+      // this.hypergraph.forEachNode((cluster: Node) => {
+      //   let nodeIntersection = sourceCluster.intersection(cluster.data.cluster);
+
+      //   let differenceA = sourceCluster.difference(cluster.data.cluster);
+      //   let differenceB = cluster.data.cluster.difference(sourceCluster);
+
+      //   console.log(nodeIntersection, differenceA, differenceB);
+
+      //   if (
+      //     nodeIntersection.size() > 0 &&
+      //     differenceA.size() > 0 &&
+      //     differenceB.size() > 0
+      //   ) {
+      //     this.clusters[differenceA.getId()] = differenceA;
+      //     this.powerEdges.add(
+      //       new PowerEdge(
+      //         differenceA.getId(),
+      //         targetCluster.getId(),
+      //         differenceA.size() + targetCluster.size()
+      //       )
+      //     );
+
+      //     this.clusters[nodeIntersection.getId()] = nodeIntersection;
+      //     this.powerEdges.add(
+      //       new PowerEdge(
+      //         nodeIntersection.getId(),
+      //         targetCluster.getId(),
+      //         nodeIntersection.size() + targetCluster.size()
+      //       )
+      //     );
+      //   }
+      // });
+
+      // this.hypergraph.forEachNode((cluster: Node) => {
+      //   let nodeIntersection = targetCluster.intersection(cluster.data.cluster);
+
+      //   let differenceA = targetCluster.difference(cluster.data.cluster);
+      //   let differenceB = cluster.data.cluster.difference(targetCluster);
+
+      //   console.log(nodeIntersection, differenceA, differenceB);
+
+      //   if (
+      //     nodeIntersection.size() > 0 &&
+      //     differenceA.size() > 0 &&
+      //     differenceB.size() > 0
+      //   ) {
+      //     this.clusters[differenceA.getId()] = differenceA;
+      //     this.powerEdges.add(
+      //       new PowerEdge(
+      //         differenceA.getId(),
+      //         targetCluster.getId(),
+      //         differenceA.size() + targetCluster.size()
+      //       )
+      //     );
+
+      //     this.clusters[nodeIntersection.getId()] = nodeIntersection;
+      //     this.powerEdges.add(
+      //       new PowerEdge(
+      //         nodeIntersection.getId(),
+      //         targetCluster.getId(),
+      //         nodeIntersection.size() + targetCluster.size()
+      //       )
+      //     );
+      //   }
+      // });
+
+      // Else: Add power nodes U and W to V′ and power edge (U, W) to E′
+
+      iterations++;
+      console.log({ edges, iterations });
+      // break;
+    }
+
     console.log(this.hypergraph.getNodesCount());
     console.log(this.powerEdges);
-  }
 
-  // Line 15.
+    // Line 15.
+
+    // Lines 41 - 42: Add all missing edges from graph to hypergraph.
+    this.graph.forEachLink((link) => {
+      // Check of there is a missing link between the singleton clusters
+      // in the hypergraph
+
+      if (!this.hypergraph.graph.hasLink(link.fromId, link.toId)) {
+        this.hypergraph.addEdge(
+          link.fromId as string,
+          link.toId as string,
+          link.data
+        );
+      }
+    });
+  }
 }

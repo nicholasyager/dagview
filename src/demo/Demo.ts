@@ -3,19 +3,27 @@ import * as THREE from 'three';
 
 import { Experience } from '../engine/Experience';
 import { Resource } from '../engine/Resources';
-import { Manifest } from '../client/local';
+import {
+  Cluster,
+  JsonPowerGraph,
+  Manifest,
+  PowerEdgeObject,
+  PowerNodeObject,
+} from '../client/local';
 import { GraphNode } from './GraphNode';
 
 import createLayout, { Layout } from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
 
 import createGraph, { Graph } from 'ngraph.graph';
+import path from 'ngraph.path';
 import { EventedType } from 'ngraph.events';
 import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
-import { PowerGraph } from './PowerGraph';
+// import { PowerGraph } from './PowerGraph';
+// import init, { greet, PowerGraph, Node, Edge } from 'powergraph';
 
 const MAX_ENERGY = 0.1;
 
@@ -45,6 +53,13 @@ export class Demo implements Experience {
       // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
+    {
+      name: 'powergraph',
+      type: 'powergraph',
+      path: 'assets/powergraph.manifest.huge.json',
+      // path: 'assets/powergraph.manifest.small.json',
+      // path: 'assets/powergraph.manifest.small.json',
+    },
   ];
 
   constructor(private engine: Engine) {
@@ -68,10 +83,114 @@ export class Demo implements Experience {
     this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) => {});
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
+    let pg_object: JsonPowerGraph = this.engine.resources.getItem('powergraph');
 
-    const graph = this.generateGraphFromManifest(manifest);
+    let clusters: { [key: string]: Cluster } = {};
 
-    // const powerGraph = new PowerGraph(graph);
+    pg_object.power_nodes.forEach((item) => {
+      clusters[item.id] = item.cluster;
+    });
+
+    const manifestGraph = this.generateGraphFromManifest(manifest);
+
+    // const powerGraph = new PowerGraph(baseGraph);
+
+    // const graph = powerGraph.hypergraph.graph;
+
+    console.log(pg_object);
+
+    // return;
+
+    let graph = createGraph();
+    pg_object.power_nodes.forEach((node: PowerNodeObject) => {
+      let graphNode = manifestGraph.getNode(node.id);
+
+      let nodeData = !!graphNode ? graphNode.data : {};
+
+      if (node.cluster.items.items.length > 1) {
+        nodeData['resource_type'] = 'cluster';
+      }
+
+      graph.addNode(node.id, {
+        unique_id: node.id,
+        cluster: node.cluster,
+
+        ...nodeData,
+      });
+
+      node.cluster.items.items.forEach((target: string) => {
+        if (node.id == target) return;
+
+        let graphNode = manifestGraph.getNode(node.id);
+
+        let nodeData = !!graphNode ? graphNode.data : {};
+
+        graph.addNode(target, {
+          unique_id: target,
+          ...nodeData,
+        });
+
+        graph.addLink(node.id, target);
+      });
+    });
+
+    pg_object.power_edges.forEach((edge: PowerEdgeObject) => {
+      if (edge.from == edge.to) return;
+      graph.addLink(edge.from, edge.to);
+    });
+
+    var degree: { [key: string]: number } = centrality.degree(graph);
+
+    // Split routing nodes! If a `cluster` node has multiple
+    // in edges and out edges, then split it into an "in" and an "out",
+    // and re-write all of the surrounding links accordingly.
+    graph.forEachNode((node) => {
+      if (Object.hasOwn(clusters, node.id)) {
+        if (clusters[node.id].items.items.length <= 1) {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      console.log(clusters[node.id]);
+
+      let links = node.links;
+
+      if (links == null) {
+        return;
+      }
+
+      let inDegree = Array.from(links).filter((link: Link<any>) => {
+        return link.toId == node.id;
+      }).length;
+      let outDegree = links.size - inDegree;
+
+      if (inDegree <= 1 && outDegree <= 1) return;
+
+      console.log(node, inDegree, outDegree);
+      graph.addNode(node.id + '.out', {
+        unique_id: node.id + '.out',
+        ...node.data,
+      });
+      graph.addNode(node.id + '.in', {
+        unique_id: node.id + '.out',
+        ...node.data,
+      });
+      graph.addLink(node.id + '.in', node.id + '.out');
+
+      node.links?.forEach((link) => {
+        if (link.fromId == node.id) {
+          graph.addLink(node.id + '.out', link.toId);
+          graph.removeLink(link);
+        } else if (link.toId == node.id) {
+          graph.addLink(link.fromId, node.id + '.in');
+          graph.removeLink(link);
+        }
+      });
+    });
+
+    // return;
 
     const layout = createLayout(graph, {
       dimensions: 3,
@@ -112,11 +231,13 @@ export class Demo implements Experience {
       }
     }
 
+    let pathFinder = path.aStar(graph);
+
     var directedBetweenness: { [key: string]: number } = centrality.betweenness(
       graph,
       true
     );
-    var degree: { [key: string]: number } = centrality.degree(graph);
+
     const sizeInterpolator = generateInterpolator(
       [1, Math.max(...Object.values(degree))],
       [0.2, 1]
@@ -131,14 +252,15 @@ export class Demo implements Experience {
 
     graph.forEachNode((node) => {
       let position = layout.getNodePosition(node.id);
+      console.log({ node, position });
 
       if (!node.data) {
-        return;
+        node.data = {};
       }
 
       node.data['owner'] = undefined;
       node.data['schema'];
-      let metadata = node.data['meta'];
+      let metadata = node.data['meta'] || {};
       if (metadata.hasOwnProperty('atlan')) {
         node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
       }
@@ -170,21 +292,35 @@ export class Demo implements Experience {
       this.engine.scene.add(graphNode);
     });
 
-    graph.forEachLink((link) => {
+    manifestGraph.forEachLink((link) => {
+      // We need to map the manifest graph to the power graph. With this in mind, we need to compute pathing
+      // in the power graph between the two ends of the manifest graph link.
       let sourceNode = graph.getNode(link.fromId);
+
+      if (!sourceNode) {
+        return;
+      }
+
       let targetNode = graph.getNode(link.toId);
 
-      if (!sourceNode || !targetNode) return;
+      let routingPath = pathFinder.find(link.fromId, link.toId);
+      let pathObjects = routingPath
+        .map((node) => {
+          return this.nodes[node.id];
+        })
+        .toReversed();
 
-      let sourceObject = this.nodes[sourceNode.id];
-      let targetObject = this.nodes[targetNode.id];
+      routingPath.map((item) => {
+        if (!this.nodes.hasOwnProperty(item.id)) {
+          console.error('Nodes is missing the item ' + item.id, item);
+        }
+      });
 
-      if (!sourceObject || !targetObject) return;
+      // console.log(link, routingPath, pathObjects);
 
       let graphEdge = new GraphEdge2(
         link.id,
-        sourceObject,
-        targetObject,
+        pathObjects,
         new THREE.Color(
           sourceNode.data['resource_type'] == 'source'
             ? 0xaaaaaa
@@ -194,6 +330,31 @@ export class Demo implements Experience {
       this.edges[link.id] = graphEdge;
       this.engine.scene.add(graphEdge);
     });
+
+    //   graph.forEachLink((link) => {
+    //     let sourceNode = graph.getNode(link.fromId);
+    //     let targetNode = graph.getNode(link.toId);
+
+    //     if (!sourceNode || !targetNode) return;
+
+    //     let sourceObject = this.nodes[sourceNode.id];
+    //     let targetObject = this.nodes[targetNode.id];
+
+    //     if (!sourceObject || !targetObject) return;
+
+    //     let graphEdge = new GraphEdge2(
+    //       link.id,
+    //       sourceObject,
+    //       targetObject,
+    //       new THREE.Color(
+    //         sourceNode.data['resource_type'] == 'source'
+    //           ? 0xaaaaaa
+    //           : colorScale(sourceNode.data['owner'])
+    //       )
+    //     );
+    //     this.edges[link.id] = graphEdge;
+    //     this.engine.scene.add(graphEdge);
+    //   });
   }
 
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
