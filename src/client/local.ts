@@ -43,6 +43,7 @@ export interface PowerEdgeObject {
 export interface JsonPowerGraph {
   power_nodes: PowerNodeObject[];
   power_edges: PowerEdgeObject[];
+  clusters: Cluster[];
 }
 
 export async function getManifest(path: string): Promise<Manifest> {

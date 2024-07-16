@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Experience } from '../engine/Experience';
 import { Resource } from '../engine/Resources';
 import {
+  Cluster,
   JsonPowerGraph,
   Manifest,
   PowerEdgeObject,
@@ -56,8 +57,8 @@ export class Demo implements Experience {
       name: 'powergraph',
       type: 'powergraph',
       path: 'assets/powergraph.manifest.huge.json',
-      // path: 'assets/manifest.big.json',
-      // path: 'assets/manifest.small.json',
+      // path: 'assets/powergraph.manifest.small.json',
+      // path: 'assets/powergraph.manifest.small.json',
     },
   ];
 
@@ -84,6 +85,12 @@ export class Demo implements Experience {
     let manifest: Manifest = this.engine.resources.getItem('manifest');
     let pg_object: JsonPowerGraph = this.engine.resources.getItem('powergraph');
 
+    let clusters: { [key: string]: Cluster } = {};
+
+    pg_object.power_nodes.forEach((item) => {
+      clusters[item.id] = item.cluster;
+    });
+
     const manifestGraph = this.generateGraphFromManifest(manifest);
 
     // const powerGraph = new PowerGraph(baseGraph);
@@ -106,6 +113,7 @@ export class Demo implements Experience {
 
       graph.addNode(node.id, {
         unique_id: node.id,
+        cluster: node.cluster,
 
         ...nodeData,
       });
@@ -130,6 +138,59 @@ export class Demo implements Experience {
       if (edge.from == edge.to) return;
       graph.addLink(edge.from, edge.to);
     });
+
+    var degree: { [key: string]: number } = centrality.degree(graph);
+
+    // Split routing nodes! If a `cluster` node has multiple
+    // in edges and out edges, then split it into an "in" and an "out",
+    // and re-write all of the surrounding links accordingly.
+    graph.forEachNode((node) => {
+      if (Object.hasOwn(clusters, node.id)) {
+        if (clusters[node.id].items.items.length <= 1) {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      console.log(clusters[node.id]);
+
+      let links = node.links;
+
+      if (links == null) {
+        return;
+      }
+
+      let inDegree = Array.from(links).filter((link: Link<any>) => {
+        return link.toId == node.id;
+      }).length;
+      let outDegree = links.size - inDegree;
+
+      if (inDegree <= 1 && outDegree <= 1) return;
+
+      console.log(node, inDegree, outDegree);
+      graph.addNode(node.id + '.out', {
+        unique_id: node.id + '.out',
+        ...node.data,
+      });
+      graph.addNode(node.id + '.in', {
+        unique_id: node.id + '.out',
+        ...node.data,
+      });
+      graph.addLink(node.id + '.in', node.id + '.out');
+
+      node.links?.forEach((link) => {
+        if (link.fromId == node.id) {
+          graph.addLink(node.id + '.out', link.toId);
+          graph.removeLink(link);
+        } else if (link.toId == node.id) {
+          graph.addLink(link.fromId, node.id + '.in');
+          graph.removeLink(link);
+        }
+      });
+    });
+
+    // return;
 
     const layout = createLayout(graph, {
       dimensions: 3,
@@ -176,7 +237,7 @@ export class Demo implements Experience {
       graph,
       true
     );
-    var degree: { [key: string]: number } = centrality.degree(graph);
+
     const sizeInterpolator = generateInterpolator(
       [1, Math.max(...Object.values(degree))],
       [0.2, 1]

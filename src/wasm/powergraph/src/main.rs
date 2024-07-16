@@ -25,9 +25,11 @@ struct Manifest {
 }
 
 fn main() {
+    let manifest_path = std::env::args().nth(1).expect("no manifest path given");
+
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
-    let f = File::open("manifest.huge.json").unwrap();
+    let f = File::open(&manifest_path).unwrap();
     let reader = BufReader::new(f);
 
     let v: Manifest = serde_json::from_reader(reader).unwrap();
@@ -160,8 +162,8 @@ fn main() {
     powergraph.decompose();
 
     // Serialize it to a JSON string. and write it to a file.
-
-    let output = File::create("powergraph.manifest.huge.json").unwrap();
+    let output_path = format!("powergraph.{}", &manifest_path);
+    let output = File::create(output_path).unwrap();
     let mut writer = BufWriter::new(output);
     let _ = serde_json::to_writer(writer, &powergraph);
 }
