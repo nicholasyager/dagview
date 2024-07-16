@@ -28,3 +28,4 @@ dist-ssr
 .run/
 .vite/
 assets/manifest.*.json
+assets/powergraph.manifest.*.json
