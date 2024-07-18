@@ -153,8 +153,6 @@ export class Demo implements Experience {
         return;
       }
 
-      console.log(clusters[node.id]);
-
       let links = node.links;
 
       if (links == null) {
@@ -168,7 +166,6 @@ export class Demo implements Experience {
 
       if (inDegree <= 1 && outDegree <= 1) return;
 
-      console.log(node, inDegree, outDegree);
       graph.addNode(node.id + '.out', {
         unique_id: node.id + '.out',
         ...node.data,
@@ -252,7 +249,6 @@ export class Demo implements Experience {
 
     graph.forEachNode((node) => {
       let position = layout.getNodePosition(node.id);
-      console.log({ node, position });
 
       if (!node.data) {
         node.data = {};
@@ -331,30 +327,15 @@ export class Demo implements Experience {
       this.engine.scene.add(graphEdge);
     });
 
-    //   graph.forEachLink((link) => {
-    //     let sourceNode = graph.getNode(link.fromId);
-    //     let targetNode = graph.getNode(link.toId);
+    // Let's see everything by default! We can do this by measuring the max difference
+    // between nodes and set this as the initial camera position.
+    let distances: number[] = [];
+    layout.forEachBody((body) => {
+      let vec = new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z);
+      distances.push(vec.length());
+    });
 
-    //     if (!sourceNode || !targetNode) return;
-
-    //     let sourceObject = this.nodes[sourceNode.id];
-    //     let targetObject = this.nodes[targetNode.id];
-
-    //     if (!sourceObject || !targetObject) return;
-
-    //     let graphEdge = new GraphEdge2(
-    //       link.id,
-    //       sourceObject,
-    //       targetObject,
-    //       new THREE.Color(
-    //         sourceNode.data['resource_type'] == 'source'
-    //           ? 0xaaaaaa
-    //           : colorScale(sourceNode.data['owner'])
-    //       )
-    //     );
-    //     this.edges[link.id] = graphEdge;
-    //     this.engine.scene.add(graphEdge);
-    //   });
+    this.engine.camera.instance.position.z = Math.max(...distances) * 2;
   }
 
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
@@ -490,33 +471,5 @@ export class Demo implements Experience {
     Object.values(this.edges).forEach((edge) => {
       edge.update(delta, this.engine);
     });
-
-    // if (this.iterations < ITERATIONS_MAX) this.layout.step()
-    // this.graph.forEachNode((node) => {
-    //   let position = this.layout.getNodePosition(node.id)
-    //   if (!node.data) {
-    //     return
-    //   }
-    //   let graphNode = this.nodes[node.data.unique_id]
-    //   graphNode.castShadow = true
-    //   graphNode.position.set(
-    //     position.x,
-    //     position.y,
-    //     position.z ? position.z : 0
-    //   )
-    // })
-    // this.iterations++
-    // this.graph.forEachLink((link) => {
-    //   let oldGraphEdge = this.edges[link.id]
-    //   this.engine.scene.remove(oldGraphEdge)
-    //   let source = this.layout.getNodePosition(link.fromId)
-    //   let target = this.layout.getNodePosition(link.toId)
-    //   let graphEdge = new GraphEdge(
-    //     new THREE.Vector3(source.x, source.y, source.z ? source.z : 0),
-    //     new THREE.Vector3(target.x, target.y, target.z ? target.z : 0)
-    //   )
-    //   this.edges[link.id] = graphEdge
-    //   this.engine.scene.add(graphEdge)
-    // })
   }
 }

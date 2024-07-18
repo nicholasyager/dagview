@@ -19,7 +19,8 @@ export class Camera implements GameEntity {
       0.1,
       1000
     );
-    this.instance.position.z = 1.6;
+
+    this.instance.position.z = 1;
     this.instance.position.y = 2;
     this.engine.scene.add(this.instance);
   }
