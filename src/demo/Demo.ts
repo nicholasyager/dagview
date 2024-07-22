@@ -15,7 +15,7 @@ import { GraphNode } from './GraphNode';
 import createLayout, { Layout } from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
 
-import createGraph, { Graph } from 'ngraph.graph';
+import createGraph, { Graph, Link } from 'ngraph.graph';
 import path from 'ngraph.path';
 import { EventedType } from 'ngraph.events';
 import { GraphEdge2 } from './GraphEdge';
@@ -57,7 +57,7 @@ export class Demo implements Experience {
       name: 'powergraph',
       type: 'powergraph',
       path: 'assets/powergraph.manifest.huge.json',
-      // path: 'assets/powergraph.manifest.small.json',
+      // path: 'assets/powergraph.manifest.big.json',
       // path: 'assets/powergraph.manifest.small.json',
     },
   ];
@@ -70,17 +70,40 @@ export class Demo implements Experience {
   }
 
   init() {
-    this.engine.raycaster.on('move', (e: RaycasterEvent[]) =>
-      this.handlePointer(e)
-    );
-    this.engine.raycaster.on('click', (e: RaycasterEvent[]) =>
-      this.handleClick(e)
-    );
-    this.engine.raycaster.on('dblclick', (e: RaycasterEvent[]) =>
-      this.handleDoubleClick(e)
-    );
+    this.engine.raycaster.on('move', (e: RaycasterEvent[]) => {
+      this.handlePointer(e);
 
-    this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) => {});
+      if (this.engine.raycaster.pointerState.isDragging) {
+        this.engine.hasUpdated = true;
+      }
+      // this.engine.hasMoved = true;
+    });
+    this.engine.raycaster.on('click', (e: RaycasterEvent[]) => {
+      this.handleClick(e);
+      this.engine.hasMoved = true;
+
+      this.engine.hasUpdated = true;
+    });
+    this.engine.raycaster.on('dblclick', (e: RaycasterEvent[]) => {
+      this.handleDoubleClick(e);
+      this.engine.hasMoved = true;
+      this.engine.hasUpdated = true;
+    });
+
+    this.engine.raycaster.on('cameraMove', (e: RaycasterEvent[]) => {
+      this.handleCameraMove(e);
+      if (this.engine.raycaster.pointerState.isDragging) {
+        this.engine.hasUpdated = true;
+        this.engine.hasMoved = true;
+      }
+    });
+
+    this.engine.raycaster.on('cameraZoom', (e: RaycasterEvent[]) => {
+      this.handleCameraMove(e);
+
+      this.engine.hasUpdated = true;
+      this.engine.hasMoved = true;
+    });
 
     let manifest: Manifest = this.engine.resources.getItem('manifest');
     let pg_object: JsonPowerGraph = this.engine.resources.getItem('powergraph');
@@ -215,13 +238,15 @@ export class Demo implements Experience {
         latestEnergyChange.reduce((acc, value) => acc + value, 0) /
         latestEnergyChange.length;
 
-      console.log({
-        event: 'Layout',
-        step: energyHistory.length,
-        forceVector: energyHistory[energyHistory.length - 1],
-        forceDiff: meanForceDiff,
-        // forcePercent: Math.abs(percentChange),
-      });
+      if (energyHistory.length % 10 == 0) {
+        console.log({
+          event: 'Layout',
+          step: energyHistory.length,
+          forceVector: energyHistory[energyHistory.length - 1],
+          forceDiff: meanForceDiff,
+          // forcePercent: Math.abs(percentChange),
+        });
+      }
 
       if (Math.abs(meanForceDiff) < MAX_ENERGY) {
         break;
@@ -259,6 +284,12 @@ export class Demo implements Experience {
       let metadata = node.data['meta'] || {};
       if (metadata.hasOwnProperty('atlan')) {
         node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
+      } else if (
+        node.data.hasOwnProperty('config') &&
+        node.data.config.hasOwnProperty('group') &&
+        !!node.data.config.group
+      ) {
+        node.data['owner'] = node.data.config.group;
       }
 
       let color = colorScale(node.data['owner']);
@@ -460,16 +491,47 @@ export class Demo implements Experience {
     if (!selected) {
       return;
     }
-    console.log(selected);
+    // console.log(selected);
 
     this.engine.camera.controls.target = new THREE.Vector3(
       ...selected.object.position
     );
   }
 
+  handleCameraMove(event: RaycasterEvent[]) {
+    let target = this.engine.camera.controls.target;
+    let distance = this.engine.camera.instance.position.distanceTo(target);
+    this.engine.camera.instance.far = Math.min(distance * 2, 2000);
+  }
+
   update(delta: number) {
+    this.engine.hasUpdated = false;
+    if (this.selectedNodes.length > 0) {
+      this.engine.hasUpdated = true;
+    }
+
     Object.values(this.edges).forEach((edge) => {
       edge.update(delta, this.engine);
+      if (this.engine.hasMoved) {
+        if (
+          !this.engine.raycaster.isSeen(edge.source) &&
+          !this.engine.raycaster.isSeen(edge.target)
+        ) {
+          edge.children[0].material.opacity = 0.01;
+        } else {
+          edge.updateEdgeOpacity(this.engine);
+          edge.source.updateDistance(this.engine);
+          edge.target.updateDistance(this.engine);
+        }
+      }
     });
+
+    // Object.values(this.nodes).forEach((node) => {
+    //   if (this.engine.hasMoved) {
+    //     node.updateDistance(this.engine);
+    //   }
+    // });
+
+    this.engine.hasMoved = false;
   }
 }

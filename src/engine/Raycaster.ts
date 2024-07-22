@@ -17,35 +17,25 @@ export type RaycasterEvent = THREE.Intersection<
 export class Raycaster extends EventEmitter {
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
-  private cameraViewProjectionMatrix: THREE.Matrix4;
-  private frustum: THREE.Frustum;
+  // private cameraViewProjectionMatrix: THREE.Matrix4;
+  // private frustum: THREE.Frustum;
+  pointerState: PointerState;
 
   constructor(private engine: Engine) {
     super();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
 
-    this.cameraViewProjectionMatrix = new THREE.Matrix4();
-    this.cameraViewProjectionMatrix.multiplyMatrices(
-      this.engine.camera.instance.projectionMatrix,
-      this.engine.camera.instance.matrixWorldInverse
-    );
-
-    // Set the frustum from the camera's view projection matrix
-    // Create a frustum
-    this.frustum = new THREE.Frustum();
-    this.frustum.setFromProjectionMatrix(this.cameraViewProjectionMatrix);
-
-    const pointerState: PointerState = {
+    this.pointerState = {
       isDragging: false,
       startX: 0,
       startY: 0,
     };
 
     document.addEventListener('mousedown', (event: MouseEvent) => {
-      pointerState.startX = event.clientX;
-      pointerState.startY = event.clientY;
-      pointerState.isDragging = false;
+      this.pointerState.startX = event.clientX;
+      this.pointerState.startY = event.clientY;
+      this.pointerState.isDragging = false;
     });
 
     document.addEventListener('mousemove', (event) => {
@@ -57,25 +47,25 @@ export class Raycaster extends EventEmitter {
         this.emit('move', this.getIntersections());
       }
 
-      const diffX = Math.abs(event.clientX - pointerState.startX);
-      const diffY = Math.abs(event.clientY - pointerState.startY);
+      const diffX = Math.abs(event.clientX - this.pointerState.startX);
+      const diffY = Math.abs(event.clientY - this.pointerState.startY);
 
       if (diffX > DRAG_THRESHOLD || diffY > DRAG_THRESHOLD) {
-        pointerState.isDragging = true;
+        this.pointerState.isDragging = true;
       }
     });
 
     document.addEventListener('wheel', (event: WheelEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
-      if (this.listenerCount('cameraMove')) {
-        this.emit('cameraMove', this);
+      if (this.listenerCount('cameraZoom')) {
+        this.emit('cameraZoom', this);
       }
     });
 
     document.addEventListener('mouseup', (event: MouseEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
 
-      if (pointerState.isDragging) {
+      if (this.pointerState.isDragging) {
         console.log('Drag event detected');
         if (this.listenerCount('cameraMove')) {
           this.emit('cameraMove', this);
@@ -90,7 +80,7 @@ export class Raycaster extends EventEmitter {
       }
 
       // Reset state
-      pointerState.isDragging = false;
+      this.pointerState.isDragging = false;
     });
 
     document.addEventListener('dblclick', (event: MouseEvent) => {
@@ -123,8 +113,18 @@ export class Raycaster extends EventEmitter {
   }
 
   public isSeen(object: THREE.Object3D) {
+    this.engine.camera.instance.updateMatrix();
+    this.engine.camera.instance.updateMatrixWorld();
+    var frustum = new THREE.Frustum();
+    frustum.setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(
+        this.engine.camera.instance.projectionMatrix,
+        this.engine.camera.instance.matrixWorldInverse
+      )
+    );
+
     // Check if the object's bounding box is within the frustum
-    return this.frustum.intersectsObject(object);
+    return frustum.intersectsObject(object);
   }
 
   private mouseEventToVector2(event: MouseEvent) {

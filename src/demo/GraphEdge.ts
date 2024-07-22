@@ -98,67 +98,60 @@ export class GraphEdge2 extends THREE.Group {
 
   handleCameraMove(raycaster: Raycaster) {
     // Confirm if the edge should be viewable.
-    this.endpointVisible =
-      raycaster.isSeen(this.source) || raycaster.isSeen(this.target);
+    this.endpointVisible = raycaster.isSeen(this.children[0]);
+    // raycaster.isSeen(this.source) || raycaster.isSeen(this.target);
   }
 
-  update(delta: number, engine: Engine) {
-    // Update the parameter t
-
-    this.time += 0.05 * delta;
-    if (this.time > 1) this.time = 0; // Reset t to loop the animation
-
-    //Update the line's opacity
+  updateEdgeOpacity(engine: Engine) {
+    const minLineOpacity = 0.01;
+    const maxLineOpacity = 0.5;
 
     // Calculate distance from mesh to camera
     if (this.children.length < 1) return;
 
-    const position = new THREE.Vector3(
-      ...this.children[0].geometry.getAttribute('position').array
+    let terminiPositions = [this.source.position, this.target.position];
+
+    const zoom = engine.camera.instance.position.distanceTo(
+      engine.camera.controls.target
     );
-    const distance = position.distanceTo(engine.camera.instance.position);
 
-    let distanceColorScale = d3.scaleSequential([0, 5], d3.interpolatePuOr);
+    const distance = Math.min(
+      ...terminiPositions.map((position) => {
+        return position.distanceTo(engine.camera.controls.target);
+      })
+    );
 
-    const distanceArrays: [number, number][] = [
-      [0, 5],
-      [5, 10],
-      [10, 30],
-      [30, 75],
-      [75, 500],
-      [500, 1000],
-    ];
+    let percentDistance = zoom / (distance + 0.0001);
+    if (percentDistance > 1) {
+      percentDistance = 1;
+    }
+
+    let lineOpacity = d3.interpolateBasis([
+      minLineOpacity,
+      minLineOpacity,
+
+      maxLineOpacity,
+      // minLineOpacity,
+    ])(percentDistance);
+
+    // console.log({
+    //   name: this.name,
+    //   zoom,
+    //   distance,
+    //   percentDistance,
+    //   lineOpacity,
+    // });
 
     // this.children[0].material.color = new THREE.Color(
-    //   distanceColorScale(findIndexOfRange(distanceArrays, distance))
+    //   d3.interpolateTurbo(lineOpacity)
     // );
 
-    // Map the distance to an opacity value (for example, using linear mapping)
-    // Adjust the mapping function as needed
-    const maxPointDistance = 25; // Maximum distance at which the mesh should be fully transparent
-    const minPointDistance = 5; // Minimum distance at which the mesh should be fully opaque
-    const maxOpacity = 1; // Full opacity
-
-    const minOpacity = 0.05; // Fully transparent
-
-    const minLineOpacity = 0.11;
-    const maxLineOpacity = 0.5;
-
-    let lineOpacity = this.calculateLineOpacity(distance, distanceArrays, [
-      [minLineOpacity, minLineOpacity],
-      [maxLineOpacity, minLineOpacity],
-      [maxLineOpacity, maxLineOpacity],
-      [minLineOpacity, maxLineOpacity],
-      [minLineOpacity, minLineOpacity],
-      [minLineOpacity, 0.0],
-    ]);
+    // lineOpacity = 0.2;
 
     if (this.selected) {
       lineOpacity = 1;
-    }
-
-    if (this.dimmed) {
-      lineOpacity = lineOpacity / 2;
+    } else if (this.dimmed) {
+      lineOpacity = lineOpacity / 4;
     }
 
     if (!this.endpointVisible) {
@@ -166,22 +159,19 @@ export class GraphEdge2 extends THREE.Group {
     }
 
     this.children[0].material.opacity = lineOpacity;
+  }
 
-    // Ensure distance is within bounds
-    const clampedPointDistance = Math.min(
-      Math.max(distance, minPointDistance),
-      maxPointDistance
-    );
+  update(delta: number, engine: Engine) {
+    // Update the parameter t
 
-    // Linearly interpolate opacity based on the distance
-    let pointOpacity =
-      minOpacity +
-      ((maxOpacity - minOpacity) * (maxPointDistance - clampedPointDistance)) /
-        (maxPointDistance - minPointDistance);
+    if (!this.endpointVisible) return;
 
-    if (this.selected) {
-      pointOpacity = 1;
-    }
+    this.time += 0.05 * delta;
+    if (this.time > 1) this.time = 0; // Reset t to loop the animation
+
+    //Update the line's opacity
+
+    let pointOpacity = 1;
 
     // Update the material opacity
 
@@ -253,10 +243,14 @@ export class GraphEdge2 extends THREE.Group {
         continue;
       }
 
-      const clampedLineDistance = Math.min(
-        Math.max(distance, distanceRange[0]),
-        distanceRange[1]
-      );
+      // const clampedLineDistance = Math.min(
+      //   Math.max(distance, distanceRange[0]),
+      //   distanceRange[1]
+      // );
+      let percentage =
+        (distance - distanceRange[0]) / (distanceRange[1] - distanceRange[0]);
+
+      return d3.interpolateNumber(opacityRange[0], opacityRange[1])(percentage);
 
       let output =
         opacityRange[0] +

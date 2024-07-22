@@ -35,6 +35,9 @@ export class Engine {
   public readonly experience!: Experience;
   private readonly loader!: Loader;
 
+  hasUpdated: boolean;
+  hasMoved: boolean;
+
   params: EngineParameters;
 
   constructor({
@@ -58,6 +61,9 @@ export class Engine {
         exposure: 2,
       },
     };
+
+    this.hasUpdated = true;
+    this.hasMoved = true;
 
     this.canvas = canvas;
     this.sizes = new Sizes(this);
@@ -100,6 +106,9 @@ export class Engine {
 
   update(delta: number) {
     if (!this.loader.isComplete) return;
+
+    if (!this.hasUpdated) return;
+    this.hasUpdated = false;
 
     this.camera.update();
     this.renderEngine.update();
