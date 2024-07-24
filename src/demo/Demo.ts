@@ -12,7 +12,7 @@ import {
 } from '../client/local';
 import { GraphNode } from './GraphNode';
 
-import createLayout, { Layout } from 'ngraph.forcelayout';
+import createLayout from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
 
 import createGraph, { Graph, Link } from 'ngraph.graph';
@@ -22,8 +22,6 @@ import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
-// import { PowerGraph } from './PowerGraph';
-// import init, { greet, PowerGraph, Node, Edge } from 'powergraph';
 
 const MAX_ENERGY = 0.1;
 
@@ -328,7 +326,7 @@ export class Demo implements Experience {
         return;
       }
 
-      let targetNode = graph.getNode(link.toId);
+      // let targetNode = graph.getNode(link.toId);
 
       let routingPath = pathFinder.find(link.fromId, link.toId);
       let pathObjects = routingPath
@@ -498,7 +496,7 @@ export class Demo implements Experience {
     );
   }
 
-  handleCameraMove(event: RaycasterEvent[]) {
+  handleCameraMove(_: RaycasterEvent[]) {
     let target = this.engine.camera.controls.target;
     let distance = this.engine.camera.instance.position.distanceTo(target);
     this.engine.camera.instance.far = Math.min(distance * 2, 2000);
@@ -519,7 +517,12 @@ export class Demo implements Experience {
           !this.engine.raycaster.isSeen(edge.target)
         ) {
           let object = edge.children[0] as THREE.Line;
-          object.material.opacity = 0.01;
+
+          if (object.material instanceof THREE.Material) {
+            object.material.opacity = 0.01;
+          } else {
+            object.material[0].opacity = 0.01;
+          }
         } else {
           edge.updateEdgeOpacity(this.engine);
           edge.source.updateDistance(this.engine);
