@@ -50,15 +50,15 @@ export class Demo implements Experience {
       name: 'manifest',
       type: 'manifest',
       // path: 'assets/manifest.huge.json',
-      // path: 'assets/manifest.big.json',
-      path: 'assets/manifest.small.json',
+      path: 'assets/manifest.big.json',
+      // path: 'assets/manifest.small.json',
     },
     {
       name: 'powergraph',
       type: 'powergraph',
       // path: 'assets/powergraph.manifest.huge.json',
-      // path: 'assets/powergraph.manifest.big.json',
-      path: 'assets/powergraph.manifest.small.json',
+      path: 'assets/powergraph.manifest.big.json',
+      // path: 'assets/powergraph.manifest.small.json',
     },
   ];
 
@@ -512,12 +512,14 @@ export class Demo implements Experience {
 
     Object.values(this.edges).forEach((edge) => {
       edge.update(delta, this.engine);
+
       if (this.engine.hasMoved) {
         if (
           !this.engine.raycaster.isSeen(edge.source) &&
           !this.engine.raycaster.isSeen(edge.target)
         ) {
-          edge.children[0].material.opacity = 0.01;
+          let object = edge.children[0] as THREE.Line;
+          object.material.opacity = 0.01;
         } else {
           edge.updateEdgeOpacity(this.engine);
           edge.source.updateDistance(this.engine);
@@ -525,12 +527,6 @@ export class Demo implements Experience {
         }
       }
     });
-
-    // Object.values(this.nodes).forEach((node) => {
-    //   if (this.engine.hasMoved) {
-    //     node.updateDistance(this.engine);
-    //   }
-    // });
 
     this.engine.hasMoved = false;
   }

@@ -24,7 +24,7 @@ use unordered_tuple::UnorderedTuple;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
-use log::{info, trace, warn};
+use log::{info, trace};
 
 #[wasm_bindgen(start)]
 fn start() {
