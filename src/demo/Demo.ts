@@ -722,7 +722,7 @@ export class Demo implements Experience {
 
     this.engine.camera.instance.position.x = 0;
     this.engine.camera.instance.position.y = 0;
-    this.engine.camera.instance.position.z = distance;
+    this.engine.camera.instance.position.z = distance * 2;
     this.engine.camera.controls.target = center_of_mass;
 
     this.selectNodes(selectedObjects, true);

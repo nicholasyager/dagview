@@ -151,7 +151,7 @@ export class GraphEdge2 extends THREE.Group {
     if (this.selected) {
       lineOpacity = 1;
     } else if (this.dimmed) {
-      lineOpacity = lineOpacity / 4;
+      lineOpacity = lineOpacity / zoom;
     }
 
     if (!this.endpointVisible) {
