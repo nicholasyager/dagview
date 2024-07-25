@@ -26,77 +26,44 @@ import { Selector } from '../engine/interface/SearchUI';
 
 const MAX_ENERGY = 0.1;
 
-function getChildren(
+function getRelative(
   graph: Graph,
   node: NGraphNode,
   maxDepth: number | undefined,
+  direction: 'parents' | 'children',
   depth?: number | undefined
 ): Set<NGraphNode> {
   let parents: Set<NGraphNode> = new Set();
 
-  if (depth == undefined) {
+  if (!depth) {
     depth = 1;
   }
+
+  console.log(node, depth, maxDepth);
 
   graph.forEachLinkedNode(
     node.id,
     (_, link) => {
-      let toNode = graph.getNode(link.toId);
+      let searchNode;
+      if (direction == 'children') {
+        searchNode = graph.getNode(link.toId);
+      } else {
+        searchNode = graph.getNode(link.fromId);
+      }
 
-      if (!toNode) {
+      if (!searchNode) {
         return;
       }
 
-      if (toNode.id == node.id) {
+      if (searchNode.id == node.id) {
         return;
       }
 
-      parents.add(toNode);
+      parents.add(searchNode);
 
-      if (maxDepth == undefined || depth + 1 <= maxDepth) {
+      if (!maxDepth || depth + 1 <= maxDepth) {
         parents = parents.union(
-          getChildren(graph, toNode, maxDepth, depth + 1)
-        );
-      }
-    },
-    false
-  );
-
-  return parents;
-}
-
-function getParents(
-  graph: Graph,
-  node: NGraphNode,
-  maxDepth: number | undefined,
-  depth?: number | undefined
-): Set<NGraphNode> {
-  let parents: Set<NGraphNode> = new Set();
-
-  if (depth == undefined) {
-    depth = 1;
-  }
-
-  console.log(node, depth);
-
-  graph.forEachLinkedNode(
-    node.id,
-    (_, link) => {
-      let fromNode = graph.getNode(link.fromId);
-
-      if (!fromNode) {
-        return;
-      }
-
-      if (fromNode.id == node.id) {
-        return;
-      }
-
-      parents.add(fromNode);
-
-      if (maxDepth == undefined || depth + 1 <= maxDepth) {
-        parents = parents.union(
-          getParents(graph, fromNode, maxDepth, depth + 1)
+          getRelative(graph, searchNode, maxDepth, direction, depth + 1)
         );
       }
     },
@@ -129,15 +96,15 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      // path: 'assets/manifest.huge.json',
-      path: 'assets/manifest.big.json',
+      path: 'assets/manifest.huge.json',
+      // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
     {
       name: 'powergraph',
       type: 'powergraph',
-      // path: 'assets/powergraph.manifest.huge.json',
-      path: 'assets/powergraph.manifest.big.json',
+      path: 'assets/powergraph.manifest.huge.json',
+      // path: 'assets/powergraph.manifest.big.json',
       // path: 'assets/powergraph.manifest.small.json',
     },
   ];
@@ -580,7 +547,7 @@ export class Demo implements Experience {
     });
   }
 
-  handleClick(intersections: RaycasterEvent[]) {
+  clearSelections() {
     this.selectedNodes.forEach((node) => {
       let selectedObject: GraphNode | undefined =
         this.engine.scene.getObjectById(node) as GraphNode;
@@ -596,6 +563,10 @@ export class Demo implements Experience {
     });
 
     this.selectedNodes = [];
+  }
+
+  handleClick(intersections: RaycasterEvent[]) {
+    this.clearSelections();
 
     const selected = intersections.filter(
       (element: RaycasterEvent) => element.object.type == 'Mesh'
@@ -664,6 +635,7 @@ export class Demo implements Experience {
   }
 
   handleSearch(selector: Selector) {
+    this.clearSelections();
     console.log(selector);
 
     let selected_nodes: Set<NGraphNode> = new Set();
@@ -689,10 +661,11 @@ export class Demo implements Experience {
           return;
         }
 
-        let nodeParents = getParents(
+        let nodeParents = getRelative(
           this.manifestGraph,
           node,
-          selector.parents_depth
+          selector.parents_depth,
+          'parents'
         );
         parents = parents.union(nodeParents);
       });
@@ -705,10 +678,11 @@ export class Demo implements Experience {
           return;
         }
 
-        let nodeChildren = getChildren(
+        let nodeChildren = getRelative(
           this.manifestGraph,
           node,
-          selector.children_depth
+          selector.children_depth,
+          'children'
         );
         children = children.union(nodeChildren);
       });

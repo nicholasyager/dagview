@@ -51,6 +51,7 @@ export class SearchUI extends EventEmitter {
       }
 
       const result: Record<string, string> = match.groups || {};
+      console.log(result);
       // console.log(result);
       // result.childrens_parents = match?.[1];
       // result.parents = match?.[2] ? { depth: +match[2].match(/\d+/)[0], rest: match[2].replace(/^\d+\+/, '') } : undefined;
@@ -60,18 +61,10 @@ export class SearchUI extends EventEmitter {
 
       let selector: Selector = {
         parents: !!result.parents,
-        parents_depth: !!result.parents_depth
-          ? undefined
-          : result.parents_depth == ''
-          ? undefined
-          : parseInt(result.parents_depth),
+        parents_depth: parseInt(result.parents_depth) || undefined,
         value: result.value as string,
         children: !!result.children,
-        children_depth: !!result.children_depth
-          ? undefined
-          : result.children_depth == ''
-          ? undefined
-          : parseInt(result.children_depth),
+        children_depth: parseInt(result.children_depth) || undefined,
       };
 
       if (this.listenerCount('search')) {
