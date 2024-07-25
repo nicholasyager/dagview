@@ -9,6 +9,7 @@ import { InfoConfig, InfoUI } from './interface/InfoUI';
 import { Experience, ExperienceConstructor } from './Experience';
 import { Loader } from './interface/Loader';
 import { Raycaster } from './Raycaster';
+import { SearchConfig, SearchUI } from './interface/SearchUI';
 
 export interface BloomParameters {
   threshold: number;
@@ -33,6 +34,7 @@ export class Engine {
   public readonly canvas!: HTMLCanvasElement;
   public readonly resources!: Resources;
   public readonly experience!: Experience;
+  public readonly searchUI: SearchUI;
   private readonly loader!: Loader;
 
   hasUpdated: boolean;
@@ -44,10 +46,12 @@ export class Engine {
     canvas,
     experience,
     info,
+    state,
   }: {
     canvas: HTMLCanvasElement;
     experience: ExperienceConstructor;
     info?: InfoConfig;
+    state?: SearchConfig;
   }) {
     if (!canvas) {
       throw new Error('No canvas provided');
@@ -73,6 +77,7 @@ export class Engine {
     this.camera = new Camera(this);
     this.raycaster = new Raycaster(this);
     this.infoUI = new InfoUI(info);
+    this.searchUI = new SearchUI(state);
     this.renderEngine = new RenderEngine(this);
     this.time = new RenderLoop(this);
     this.experience = new experience(this);

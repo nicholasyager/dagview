@@ -15,15 +15,96 @@ import { GraphNode } from './GraphNode';
 import createLayout from 'ngraph.forcelayout';
 import centrality from 'ngraph.centrality';
 
-import createGraph, { Graph, Link } from 'ngraph.graph';
+import createGraph, { Graph, Link, Node as NGraphNode } from 'ngraph.graph';
 import path from 'ngraph.path';
 import { EventedType } from 'ngraph.events';
 import { GraphEdge2 } from './GraphEdge';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
+import { Selector } from '../engine/interface/SearchUI';
 
 const MAX_ENERGY = 0.1;
+
+function getChildren(
+  graph: Graph,
+  node: NGraphNode,
+  maxDepth: number | undefined,
+  depth?: number | undefined
+): Set<NGraphNode> {
+  let parents: Set<NGraphNode> = new Set();
+
+  if (depth == undefined) {
+    depth = 1;
+  }
+
+  graph.forEachLinkedNode(
+    node.id,
+    (_, link) => {
+      let toNode = graph.getNode(link.toId);
+
+      if (!toNode) {
+        return;
+      }
+
+      if (toNode.id == node.id) {
+        return;
+      }
+
+      parents.add(toNode);
+
+      if (maxDepth == undefined || depth + 1 <= maxDepth) {
+        parents = parents.union(
+          getChildren(graph, toNode, maxDepth, depth + 1)
+        );
+      }
+    },
+    false
+  );
+
+  return parents;
+}
+
+function getParents(
+  graph: Graph,
+  node: NGraphNode,
+  maxDepth: number | undefined,
+  depth?: number | undefined
+): Set<NGraphNode> {
+  let parents: Set<NGraphNode> = new Set();
+
+  if (depth == undefined) {
+    depth = 1;
+  }
+
+  console.log(node, depth);
+
+  graph.forEachLinkedNode(
+    node.id,
+    (_, link) => {
+      let fromNode = graph.getNode(link.fromId);
+
+      if (!fromNode) {
+        return;
+      }
+
+      if (fromNode.id == node.id) {
+        return;
+      }
+
+      parents.add(fromNode);
+
+      if (maxDepth == undefined || depth + 1 <= maxDepth) {
+        parents = parents.union(
+          getParents(graph, fromNode, maxDepth, depth + 1)
+        );
+      }
+    },
+    false
+  );
+
+  return parents;
+}
 
 function generateInterpolator(
   domain: [number, number],
@@ -42,6 +123,7 @@ export class Demo implements Experience {
   edges: { [key: string]: GraphEdge2 };
   iterations: number;
   selectedNodes: number[];
+  manifestGraph: Graph | undefined;
 
   resources: Resource[] = [
     {
@@ -65,6 +147,7 @@ export class Demo implements Experience {
     this.edges = {};
     this.iterations = 0;
     this.selectedNodes = [];
+    this.manifestGraph = undefined;
   }
 
   init() {
@@ -103,6 +186,15 @@ export class Demo implements Experience {
       this.engine.hasMoved = true;
     });
 
+    this.engine.searchUI.on('search', (e: Selector) => {
+      this.handleSearch(e);
+
+      // if (this.engine.raycaster.pointerState.isDragging) {
+      //   this.engine.hasUpdated = true;
+      // }
+      // this.engine.hasMoved = true;
+    });
+
     let manifest: Manifest = this.engine.resources.getItem('manifest');
     let pg_object: JsonPowerGraph = this.engine.resources.getItem('powergraph');
 
@@ -113,6 +205,7 @@ export class Demo implements Experience {
     });
 
     const manifestGraph = this.generateGraphFromManifest(manifest);
+    this.manifestGraph = manifestGraph;
 
     // const powerGraph = new PowerGraph(baseGraph);
 
@@ -124,7 +217,9 @@ export class Demo implements Experience {
 
     let graph = createGraph();
     pg_object.power_nodes.forEach((node: PowerNodeObject) => {
+      console.log(node.id);
       let graphNode = manifestGraph.getNode(node.id);
+      console.log(graphNode);
 
       let nodeData = !!graphNode ? graphNode.data : {};
 
@@ -144,12 +239,17 @@ export class Demo implements Experience {
 
         let graphNode = manifestGraph.getNode(node.id);
 
-        let nodeData = !!graphNode ? graphNode.data : {};
-
-        graph.addNode(target, {
-          unique_id: target,
-          ...nodeData,
-        });
+        let existingNode = graph.hasNode(target);
+        if (!existingNode) {
+          let nodeData = !!graphNode ? graphNode.data : {};
+          graph.addNode(target, {
+            unique_id: target,
+            ...nodeData,
+          });
+        } else if (!Object(existingNode.data).hasOwnProperty('name')) {
+          let nodeData = !!graphNode ? graphNode.data : {};
+          existingNode.data = nodeData;
+        }
 
         graph.addLink(node.id, target);
       });
@@ -312,7 +412,15 @@ export class Demo implements Experience {
         position.z ? position.z : 0
       );
 
-      this.nodes[node.id] = graphNode;
+      if (!Object(this.nodes).hasOwnProperty(node.id)) {
+        this.nodes[node.id] = graphNode;
+      } else {
+        console.error(
+          'Found a duplicate injection of ' + node.id,
+          graphNode,
+          this.nodes[node.id]
+        );
+      }
 
       this.engine.scene.add(graphNode);
     });
@@ -416,6 +524,62 @@ export class Demo implements Experience {
     }
   }
 
+  selectNodes(nodes: GraphNode[], containedSelection?: boolean) {
+    if (!containedSelection) {
+      containedSelection = false;
+    }
+
+    Object.values(this.edges).forEach((edge) => {
+      edge.dim();
+    });
+
+    Object.values(this.nodes).forEach((node) => {
+      node.dim();
+    });
+
+    let selectedNodeIds: Set<number> = new Set(nodes.map((node) => node.id));
+
+    nodes.forEach((node) => {
+      this.selectedNodes.push(node.id);
+
+      let selectedObject: GraphNode | undefined =
+        this.engine.scene.getObjectById(node.id) as GraphNode;
+      if (!!selectedObject) {
+        selectedObject.select();
+
+        // Find all edges and select those, too!
+        let childEdges = this.engine.scene.getObjectsByProperty(
+          'source',
+          selectedObject
+        ) as GraphEdge2[];
+        let parentEdges = this.engine.scene.getObjectsByProperty(
+          'target',
+          selectedObject
+        ) as GraphEdge2[];
+
+        let edges = childEdges.concat(parentEdges);
+
+        edges.forEach((edge) => {
+          if (containedSelection) {
+            if (
+              !selectedNodeIds.has(edge.source.id) ||
+              !selectedNodeIds.has(edge.target.id)
+            ) {
+              return;
+            }
+          }
+          edge.select();
+          edge.dedim();
+
+          edge.source.dedim();
+          edge.target.dedim();
+
+          this.selectedNodes.push(edge.id);
+        });
+      }
+    });
+  }
+
   handleClick(intersections: RaycasterEvent[]) {
     this.selectedNodes.forEach((node) => {
       let selectedObject: GraphNode | undefined =
@@ -441,43 +605,8 @@ export class Demo implements Experience {
       return;
     }
 
-    this.selectedNodes.push(selected.object.id);
-
-    Object.values(this.edges).forEach((edge) => {
-      edge.dim();
-    });
-
-    Object.values(this.nodes).forEach((node) => {
-      node.dim();
-    });
-
-    let selectedObject: GraphNode | undefined = this.engine.scene.getObjectById(
-      selected.object.id
-    ) as GraphNode;
-    if (!!selectedObject) {
-      selectedObject.select();
-
-      // Find all edges and select those, too!
-      let childEdges = this.engine.scene.getObjectsByProperty(
-        'source',
-        selectedObject
-      ) as GraphEdge2[];
-      let parentEdges = this.engine.scene.getObjectsByProperty(
-        'target',
-        selectedObject
-      ) as GraphEdge2[];
-
-      let edges = childEdges.concat(parentEdges);
-
-      edges.forEach((edge) => {
-        edge.select();
-        edge.dedim();
-
-        edge.source.dedim();
-        edge.target.dedim();
-
-        this.selectedNodes.push(edge.id);
-      });
+    if (selected.object instanceof GraphNode) {
+      this.selectNodes([selected.object]);
     }
   }
 
@@ -532,5 +661,98 @@ export class Demo implements Experience {
     });
 
     this.engine.hasMoved = false;
+  }
+
+  handleSearch(selector: Selector) {
+    console.log(selector);
+
+    let selected_nodes: Set<NGraphNode> = new Set();
+    if (!this.manifestGraph) {
+      return;
+    }
+
+    this.manifestGraph.forEachNode((node) => {
+      console.log(node);
+      if (
+        node.data.name == selector.value ||
+        node.data.alias == selector.value
+      ) {
+        selected_nodes.add(node);
+      }
+    });
+
+    // Get Parents
+    let parents: Set<NGraphNode> = new Set();
+    if (selector.parents) {
+      Array.from(selected_nodes).forEach((node) => {
+        if (!this.manifestGraph) {
+          return;
+        }
+
+        let nodeParents = getParents(
+          this.manifestGraph,
+          node,
+          selector.parents_depth
+        );
+        parents = parents.union(nodeParents);
+      });
+    }
+
+    let children: Set<NGraphNode> = new Set();
+    if (selector.children) {
+      Array.from(selected_nodes).forEach((node) => {
+        if (!this.manifestGraph) {
+          return;
+        }
+
+        let nodeChildren = getChildren(
+          this.manifestGraph,
+          node,
+          selector.children_depth
+        );
+        children = children.union(nodeChildren);
+      });
+    }
+
+    let all_nodes = selected_nodes.union(parents).union(children);
+
+    // Target center mass for the selection.
+
+    let selectedObjects = Array.from(all_nodes)
+      .map(
+        (node) =>
+          this.engine.scene.getObjectByName(node.id as string) as GraphNode
+      )
+      .filter((node) => !!node);
+
+    // Find the center of the selected nodes
+    let vectorSum = selectedObjects.reduce(
+      (output, object) => {
+        output.position.add(object.position);
+        output.items += 1;
+        return output;
+      },
+      { position: new THREE.Vector3(0, 0, 0), items: 0 }
+    );
+
+    let center_of_mass = vectorSum.position.divideScalar(vectorSum.items);
+
+    // Find the correct zoom level for the selected nodes
+    let distance = selectedObjects.reduce((distance, object) => {
+      let itemDistance = object.position.distanceTo(center_of_mass);
+      if (itemDistance > distance) {
+        return itemDistance;
+      }
+      return distance;
+    }, 0);
+
+    this.engine.camera.instance.position.x = 0;
+    this.engine.camera.instance.position.y = 0;
+    this.engine.camera.instance.position.z = distance;
+    this.engine.camera.controls.target = center_of_mass;
+
+    this.selectNodes(selectedObjects, true);
+    this.engine.hasMoved = true;
+    this.engine.hasUpdated = true;
   }
 }

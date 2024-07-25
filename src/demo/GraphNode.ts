@@ -67,7 +67,7 @@ export class GraphNode extends THREE.Mesh {
     // }
 
     const minLineOpacity = 0.05;
-    const maxLineOpacity = 0.3;
+    // const maxLineOpacity = 0.3;
 
     const zoom = engine.camera.instance.position.distanceTo(
       engine.camera.controls.target
