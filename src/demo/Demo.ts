@@ -24,6 +24,8 @@ import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
 import { Selector } from '../engine/interface/SearchUI';
 
+const excludedResources = ['test', 'unit_test'];
+
 const MAX_ENERGY = 0.1;
 
 function getRelative(
@@ -96,14 +98,14 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.huge.json',
+      path: 'assets/manifest.small.json',
       // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
     {
       name: 'powergraph',
       type: 'powergraph',
-      path: 'assets/powergraph.manifest.huge.json',
+      path: 'assets/powergraph.manifest.small.json',
       // path: 'assets/powergraph.manifest.big.json',
       // path: 'assets/powergraph.manifest.small.json',
     },
@@ -445,7 +447,9 @@ export class Demo implements Experience {
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
     let graph = createGraph();
     for (let [key, value] of Object.entries(manifest.nodes)) {
-      if (key.startsWith('test')) continue;
+      let resourceType = key.split('.')[0];
+
+      if (excludedResources.includes(resourceType)) continue;
       graph.addNode(key, value);
     }
 
@@ -454,7 +458,9 @@ export class Demo implements Experience {
     }
 
     for (let [source, targets] of Object.entries(manifest.child_map)) {
-      if (source.startsWith('test')) continue;
+      let resourceType = source.split('.')[0];
+      if (excludedResources.includes(resourceType)) continue;
+
       if (source.startsWith('exposure')) continue;
       if (!graph.hasNode(source)) continue;
 
@@ -465,7 +471,8 @@ export class Demo implements Experience {
     }
 
     for (let [target, sources] of Object.entries(manifest.parent_map)) {
-      if (target.startsWith('test')) continue;
+      let resourceType = target.split('.')[0];
+      if (excludedResources.includes(resourceType)) continue;
       if (target.startsWith('exposure')) continue;
       sources.forEach((source: string) => {
         if (!graph.hasNode(source)) return;
