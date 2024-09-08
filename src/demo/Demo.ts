@@ -653,8 +653,9 @@ export class Demo implements Experience {
     this.manifestGraph.forEachNode((node) => {
       console.log(node);
       if (
-        node.data.name == selector.value ||
-        node.data.alias == selector.value
+        (Object.hasOwn(node.data, 'name') &&
+          node.data.name == selector.value) ||
+        (Object.hasOwn(node.data, 'alias') && node.data.alias == selector.value)
       ) {
         selected_nodes.add(node);
       }
