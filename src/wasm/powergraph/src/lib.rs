@@ -6,7 +6,7 @@ mod similarity_matrix;
 mod unordered_tuple;
 mod utils;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -181,10 +181,18 @@ impl PartialEq for PowerEdgeCandidate {
     }
 }
 
-impl Eq for PowerEdgeCandidate {
-    // fn eq(&self, other: &Self) -> bool {
-    //     self.from == other.from && self.to == other.to && self.size == other.size
-    // }
+impl Eq for PowerEdgeCandidate {}
+
+impl PartialOrd for PowerEdgeCandidate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PowerEdgeCandidate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        ((self.size * 10000.0) as u32).cmp(&((other.size * 10000.0) as u32))
+    }
 }
 
 #[derive(Debug)]
@@ -502,7 +510,8 @@ impl PowerGraph {
         self.power_nodes.extend(singletons);
 
         // Generate candidates for PowerEdges
-        let mut edge_candidates: Vec<PowerEdgeCandidate> = Vec::new();
+        let mut edge_candidates: BinaryHeap<PowerEdgeCandidate> = BinaryHeap::new();
+        let mut queued_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
 
         // console_log!("Generating pairs of clusters to evaluate.",);
 
@@ -573,13 +582,13 @@ impl PowerGraph {
 
                 let edges = self.subgraph(&node_union);
 
-                edge_candidates.push({
-                    PowerEdgeCandidate {
-                        from: cluster_one.clone(),
-                        to: cluster_two.clone(),
-                        size: edges.len() as f32,
-                    }
-                })
+                let candidate = PowerEdgeCandidate {
+                    from: cluster_one.clone(),
+                    to: cluster_two.clone(),
+                    size: edges.len() as f32,
+                };
+                queued_candidates.insert(candidate.clone());
+                edge_candidates.push(candidate);
             }
 
             if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one, &cluster_two) {
@@ -590,13 +599,13 @@ impl PowerGraph {
                 // );
 
                 let edges = self.subgraph(&node_union);
-                edge_candidates.push({
-                    PowerEdgeCandidate {
-                        from: cluster_one.clone(),
-                        to: cluster_two.clone(),
-                        size: edges.len() as f32 / 2_f32,
-                    }
-                })
+                let candidate = PowerEdgeCandidate {
+                    from: cluster_one.clone(),
+                    to: cluster_two.clone(),
+                    size: edges.len() as f32 / 2_f32,
+                };
+                queued_candidates.insert(candidate.clone());
+                edge_candidates.push(candidate);
             }
         }
 
@@ -604,11 +613,7 @@ impl PowerGraph {
 
         let mut completed_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
 
-        while edge_candidates.len() > 0 {
-            edge_candidates.sort_by_key(|item| (item.size * 10000_f32) as u32);
-
-            let edge_candidate = edge_candidates.pop().unwrap();
-
+        while let Some(edge_candidate) = edge_candidates.pop() {
             let candidate_processor_results =
                 self.process_edge_candidate(&edge_candidate, &cluster_repository);
 
@@ -630,10 +635,11 @@ impl PowerGraph {
                         cluster_repository.add_cluster(&candidate.from);
                         cluster_repository.add_cluster(&candidate.to);
 
-                        if !edge_candidates.contains(&candidate) {
+                        if !queued_candidates.contains(&candidate) {
+                            queued_candidates.insert(candidate.clone());
                             edge_candidates.push(candidate.clone());
                         }
-                        completed_candidates.insert(candidate.clone());
+                        completed_candidates.insert(candidate);
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
                         // console_log!("Power Node found: {:?}", power_node);
