@@ -502,11 +502,24 @@ export class Demo implements Experience {
     )[0];
 
     let element = document.getElementsByTagName('h1')[0];
+    let subtitle = document.getElementById('node-owner');
+    if (!subtitle && element?.parentElement) {
+      subtitle = document.createElement('p');
+      subtitle.id = 'node-owner';
+      element.after(subtitle);
+    }
+
     if (!!selected && !!element) {
       let object = selected.object as GraphNode;
       element.textContent = object.nodeData.unique_id;
+      if (subtitle) {
+        subtitle.textContent = object.nodeData.owner || '';
+      }
     } else {
       element.textContent = '';
+      if (subtitle) {
+        subtitle.textContent = '';
+      }
     }
   }
 
