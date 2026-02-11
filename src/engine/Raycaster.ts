@@ -17,14 +17,16 @@ export type RaycasterEvent = THREE.Intersection<
 export class Raycaster extends EventEmitter {
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
-  // private cameraViewProjectionMatrix: THREE.Matrix4;
-  // private frustum: THREE.Frustum;
+  private frustum: THREE.Frustum;
+  private _projScreenMatrix: THREE.Matrix4;
   pointerState: PointerState;
 
   constructor(private engine: Engine) {
     super();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
+    this.frustum = new THREE.Frustum();
+    this._projScreenMatrix = new THREE.Matrix4();
 
     this.pointerState = {
       isDragging: false,
@@ -112,19 +114,18 @@ export class Raycaster extends EventEmitter {
     return intersections;
   }
 
-  public isSeen(object: THREE.Object3D) {
+  public updateFrustum() {
     this.engine.camera.instance.updateMatrix();
     this.engine.camera.instance.updateMatrixWorld();
-    var frustum = new THREE.Frustum();
-    frustum.setFromProjectionMatrix(
-      new THREE.Matrix4().multiplyMatrices(
-        this.engine.camera.instance.projectionMatrix,
-        this.engine.camera.instance.matrixWorldInverse
-      )
+    this._projScreenMatrix.multiplyMatrices(
+      this.engine.camera.instance.projectionMatrix,
+      this.engine.camera.instance.matrixWorldInverse
     );
+    this.frustum.setFromProjectionMatrix(this._projScreenMatrix);
+  }
 
-    // Check if the object's bounding box is within the frustum
-    return frustum.intersectsObject(object);
+  public isSeen(object: THREE.Object3D) {
+    return this.frustum.intersectsObject(object);
   }
 
   private mouseEventToVector2(event: MouseEvent) {

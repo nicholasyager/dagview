@@ -728,28 +728,47 @@ export class Demo implements Experience {
       this.engine.hasUpdated = true;
     }
 
-    Object.values(this.edges).forEach((edge) => {
-      edge.update(delta, this.engine);
+    const hasMoved = this.engine.hasMoved;
+    if (hasMoved) {
+      this.engine.raycaster.updateFrustum();
+    }
 
-      if (this.engine.hasMoved) {
+    const OPACITY_THRESHOLD = 0.02;
+    const visibleNodes = new Set<GraphNode>();
+
+    Object.values(this.edges).forEach((edge) => {
+      if (hasMoved) {
         if (
           !this.engine.raycaster.isSeen(edge.source) &&
           !this.engine.raycaster.isSeen(edge.target)
         ) {
-          let object = edge.children[0] as THREE.Line;
-
-          if (object.material instanceof THREE.Material) {
-            object.material.opacity = 0.01;
-          } else {
-            object.material[0].opacity = 0.01;
-          }
+          edge.visible = false;
         } else {
+          edge.visible = true;
           edge.updateEdgeOpacity(this.engine);
-          edge.source.updateDistance(this.engine);
-          edge.target.updateDistance(this.engine);
+
+          // Hide edges with very low opacity (zoomed out)
+          const lineChild = edge.children[0] as THREE.Line;
+          const mat = lineChild.material as THREE.Material;
+          if (mat.opacity < OPACITY_THRESHOLD && !edge.selected) {
+            edge.visible = false;
+          } else {
+            visibleNodes.add(edge.source);
+            visibleNodes.add(edge.target);
+          }
         }
       }
+
+      if (edge.visible) {
+        edge.update(delta, this.engine);
+      }
     });
+
+    if (hasMoved) {
+      for (const node of visibleNodes) {
+        node.updateDistance(this.engine);
+      }
+    }
 
     this.engine.hasMoved = false;
   }
