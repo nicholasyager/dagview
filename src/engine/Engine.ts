@@ -85,7 +85,11 @@ export class Engine {
     this.loader = new Loader();
 
     this.resources.on('loaded', () => {
-      this.experience.init();
+      try {
+        this.experience.init();
+      } catch (e) {
+        console.error('Experience init failed:', e);
+      }
       this.loader.complete();
     });
 

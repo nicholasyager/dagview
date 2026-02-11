@@ -98,14 +98,16 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.small.json',
+      path: 'assets/manifest.20260210.json',
+      // path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
     {
       name: 'powergraph',
       type: 'powergraph',
-      path: 'assets/powergraph.manifest.small.json',
+      path: 'assets/powergraph.manifest.20260210.json',
+      // path: 'assets/powergraph.manifest.huge.json',
       // path: 'assets/powergraph.manifest.big.json',
       // path: 'assets/powergraph.manifest.small.json',
     },
@@ -327,12 +329,19 @@ export class Demo implements Experience {
       true
     );
 
+    const degreeValues = Object.values(degree);
+    const maxDegree = degreeValues.reduce((a, b) => (a > b ? a : b), -Infinity);
+
     const sizeInterpolator = generateInterpolator(
-      [1, Math.max(...Object.values(degree))],
+      [1, maxDegree],
       [0.2, 1]
     );
 
-    const maxBetweenness = Math.max(...Object.values(directedBetweenness));
+    const betweennessValues = Object.values(directedBetweenness);
+    const maxBetweenness = betweennessValues.reduce(
+      (a, b) => (a > b ? a : b),
+      -Infinity
+    );
 
     const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
 
@@ -350,7 +359,8 @@ export class Demo implements Experience {
       node.data['schema'];
       let metadata = node.data['meta'] || {};
       if (metadata.hasOwnProperty('atlan')) {
-        node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
+        node.data['owner'] =
+          metadata['atlan']?.['attributes']?.['ownerGroups']?.[0];
       } else if (
         node.data.hasOwnProperty('config') &&
         node.data.config.hasOwnProperty('group') &&
@@ -406,19 +416,20 @@ export class Demo implements Experience {
       // let targetNode = graph.getNode(link.toId);
 
       let routingPath = pathFinder.find(link.fromId, link.toId);
+
+      if (routingPath.length < 2) {
+        return;
+      }
+
       let pathObjects = routingPath
         .map((node) => {
           return this.nodes[node.id];
         })
         .toReversed();
 
-      routingPath.map((item) => {
-        if (!this.nodes.hasOwnProperty(item.id)) {
-          console.error('Nodes is missing the item ' + item.id, item);
-        }
-      });
-
-      // console.log(link, routingPath, pathObjects);
+      if (pathObjects.some((obj) => !obj)) {
+        return;
+      }
 
       let graphEdge = new GraphEdge2(
         link.id,
@@ -441,7 +452,8 @@ export class Demo implements Experience {
       distances.push(vec.length());
     });
 
-    this.engine.camera.instance.position.z = Math.max(...distances) * 2;
+    const maxDistance = distances.reduce((a, b) => (a > b ? a : b), 0);
+    this.engine.camera.instance.position.z = maxDistance * 2;
   }
 
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
