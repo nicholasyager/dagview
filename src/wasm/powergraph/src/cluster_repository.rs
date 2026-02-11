@@ -49,27 +49,28 @@ impl ClusterRepository {
     }
 
     fn calculate_overlaps(&self, cluster: &Cluster) -> HashMap<(String, String), OverlapType> {
+        let cluster_id = cluster.get_id().to_string();
         let overlaps = self
             .clusters
             .iter()
             .filter_map(|(comparison_cluster_id, comparison_cluster)| {
                 if is_equal_clusters(cluster, comparison_cluster) {
                     return Some((
-                        (cluster.get_id().clone(), comparison_cluster_id.clone()),
+                        (cluster_id.clone(), comparison_cluster_id.clone()),
                         OverlapType::Equal,
                     ));
                 }
 
                 if is_partial_subset(cluster, comparison_cluster) {
                     return Some((
-                        (cluster.get_id().clone(), comparison_cluster_id.clone()),
+                        (cluster_id.clone(), comparison_cluster_id.clone()),
                         OverlapType::Partial,
                     ));
                 }
 
                 if is_subset(cluster, comparison_cluster) {
                     return Some((
-                        (cluster.get_id().clone(), comparison_cluster_id.clone()),
+                        (cluster_id.clone(), comparison_cluster_id.clone()),
                         OverlapType::Subset,
                     ));
                 }
@@ -88,7 +89,8 @@ impl ClusterRepository {
 
     // Add a new Cluster into the ClusterRepository and identify overlapping clusters.
     pub fn add_cluster(&mut self, cluster: &Cluster) {
-        self.clusters.insert(cluster.get_id(), cluster.clone());
+        let cluster_id = cluster.get_id().to_string();
+        self.clusters.insert(cluster_id.clone(), cluster.clone());
 
         let overlaps = self.calculate_overlaps(cluster);
         self.overlaps.extend(overlaps.into_iter());
@@ -97,11 +99,11 @@ impl ClusterRepository {
             self.node_cluster_neighbor_map
                 .entry(node)
                 .and_modify(|mapping| {
-                    mapping.insert(cluster.get_id());
+                    mapping.insert(cluster_id.clone());
                 })
                 .or_insert_with(|| {
                     let mut mapping = HashSet::new();
-                    mapping.insert(cluster.get_id());
+                    mapping.insert(cluster_id.clone());
                     return mapping;
                 });
         });
