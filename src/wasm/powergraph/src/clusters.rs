@@ -83,8 +83,8 @@ impl Cluster {
         let parents = self.neighbors.difference(&other_cluster.neighbors);
 
         Cluster::new(
-            Set::from_set(items.iter().map(|i| i.clone()).collect()),
-            Set::from_set(parents.iter().map(|i| i.clone()).collect()),
+            Set::from_set(items.into_iter().cloned().collect()),
+            Set::from_set(parents.into_iter().cloned().collect()),
         )
     }
 
