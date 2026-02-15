@@ -29,3 +29,4 @@ dist-ssr
 .vite/
 assets/manifest.*.json
 assets/powergraph.manifest.*.json
+src/wasm/powergraph/powergraph.manifest.*.json
