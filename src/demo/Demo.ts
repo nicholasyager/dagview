@@ -129,8 +129,10 @@ export class Demo implements Experience {
   }
 
   private getCacheKey(): string {
-    const manifestPath = this.resources.find((r) => r.name === 'manifest')?.path ?? '';
-    const powergraphPath = this.resources.find((r) => r.name === 'powergraph')?.path ?? '';
+    const manifestPath =
+      this.resources.find((r) => r.name === 'manifest')?.path ?? '';
+    const powergraphPath =
+      this.resources.find((r) => r.name === 'powergraph')?.path ?? '';
     return `layout:${manifestPath}|${powergraphPath}`;
   }
 
@@ -415,12 +417,9 @@ export class Demo implements Experience {
 
     const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
 
-    let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-
+    // First pass: assign owners and count frequencies.
+    const ownerCounts = new Map<string, number>();
     graph.forEachNode((node) => {
-      let position = positions[node.id as string];
-      if (!position) return;
-
       if (!node.data) {
         node.data = {};
       }
@@ -439,7 +438,34 @@ export class Demo implements Experience {
         node.data['owner'] = node.data.config.group;
       }
 
-      let color = colorScale(node.data['owner']);
+      const owner = node.data['owner'];
+      if (owner != null) {
+        ownerCounts.set(owner, (ownerCounts.get(owner) ?? 0) + 1);
+      }
+    });
+
+    // Rank owners by frequency and assign deterministic colors.
+    const rankedOwners = [...ownerCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([owner]) => owner);
+
+    const ownerColorMap = new Map<string, string>();
+    const scheme = d3.schemeCategory10;
+    for (let i = 0; i < rankedOwners.length; i++) {
+      ownerColorMap.set(rankedOwners[i], i < 8 ? scheme[i] : scheme[8]);
+    }
+
+    function getOwnerColor(owner: string | undefined): string {
+      if (owner == null) return '#aaaaaa';
+      return ownerColorMap.get(owner) ?? scheme[8];
+    }
+
+    // Second pass: create graph nodes.
+    graph.forEachNode((node) => {
+      let position = positions[node.id as string];
+      if (!position) return;
+
+      let color = getOwnerColor(node.data['owner']);
 
       let graphNode = new GraphNode(
         node.data.unique_id,
@@ -485,11 +511,7 @@ export class Demo implements Experience {
         let graphEdge = new GraphEdge2(
           link.id,
           pathObjects,
-          new THREE.Color(
-            sourceNode.data['resource_type'] == 'source'
-              ? 0xaaaaaa
-              : colorScale(sourceNode.data['owner'])
-          )
+          new THREE.Color(getOwnerColor(sourceNode.data['owner']))
         );
         this.edges[link.id] = graphEdge;
         this.engine.scene.add(graphEdge);
@@ -516,11 +538,7 @@ export class Demo implements Experience {
         let graphEdge = new GraphEdge2(
           link.id,
           pathObjects,
-          new THREE.Color(
-            sourceNode.data['resource_type'] == 'source'
-              ? 0xaaaaaa
-              : colorScale(sourceNode.data['owner'])
-          )
+          new THREE.Color(getOwnerColor(sourceNode.data['owner']))
         );
         this.edges[link.id] = graphEdge;
         this.engine.scene.add(graphEdge);
