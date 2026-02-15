@@ -24,6 +24,13 @@ import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
 import { Selector } from '../engine/interface/SearchUI';
 
+type CachedLayout = {
+  positions: { [nodeId: string]: { x: number; y: number; z: number } };
+  degree: { [nodeId: string]: number };
+  betweenness: { [nodeId: string]: number };
+  routingPaths: { [edgeKey: string]: string[] };
+};
+
 const excludedResources = ['test', 'unit_test'];
 
 const MAX_ENERGY = 0.1;
@@ -98,14 +105,16 @@ export class Demo implements Experience {
     {
       name: 'manifest',
       type: 'manifest',
-      path: 'assets/manifest.small.json',
+      path: 'assets/manifest.20260210.json',
+      // path: 'assets/manifest.huge.json',
       // path: 'assets/manifest.big.json',
       // path: 'assets/manifest.small.json',
     },
     {
       name: 'powergraph',
       type: 'powergraph',
-      path: 'assets/powergraph.manifest.small.json',
+      path: 'assets/powergraph.manifest.20260210.json',
+      // path: 'assets/powergraph.manifest.huge.json',
       // path: 'assets/powergraph.manifest.big.json',
       // path: 'assets/powergraph.manifest.small.json',
     },
@@ -117,6 +126,54 @@ export class Demo implements Experience {
     this.iterations = 0;
     this.selectedNodes = [];
     this.manifestGraph = undefined;
+  }
+
+  private getCacheKey(): string {
+    const manifestPath = this.resources.find((r) => r.name === 'manifest')?.path ?? '';
+    const powergraphPath = this.resources.find((r) => r.name === 'powergraph')?.path ?? '';
+    return `layout:${manifestPath}|${powergraphPath}`;
+  }
+
+  private loadCache(key: string): CachedLayout | null {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw) as CachedLayout;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveCache(key: string, data: CachedLayout): void {
+    // Clear stale cache entries for other manifests
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('layout:') && k !== key) {
+        localStorage.removeItem(k);
+      }
+    }
+
+    const roundingReplacer = (_k: string, v: unknown) =>
+      typeof v === 'number' ? Math.round(v * 1e4) / 1e4 : v;
+
+    try {
+      localStorage.setItem(key, JSON.stringify(data, roundingReplacer));
+    } catch {
+      // Full cache too large — save without routing paths
+      // (layout + centrality are the most expensive to recompute)
+      try {
+        const partial: CachedLayout = {
+          positions: data.positions,
+          degree: data.degree,
+          betweenness: data.betweenness,
+          routingPaths: {},
+        };
+        localStorage.setItem(key, JSON.stringify(partial, roundingReplacer));
+        console.warn('Layout cached without routing paths (storage limit)');
+      } catch (e) {
+        console.warn('Failed to save layout cache:', e);
+      }
+    }
   }
 
   init() {
@@ -229,8 +286,6 @@ export class Demo implements Experience {
       graph.addLink(edge.from, edge.to);
     });
 
-    var degree: { [key: string]: number } = centrality.degree(graph);
-
     // Split routing nodes! If a `cluster` node has multiple
     // in edges and out edges, then split it into an "in" and an "out",
     // and re-write all of the surrounding links accordingly.
@@ -277,70 +332,94 @@ export class Demo implements Experience {
       });
     });
 
-    // return;
+    const cacheKey = this.getCacheKey();
+    const cached = this.loadCache(cacheKey);
 
-    const layout = createLayout(graph, {
-      dimensions: 3,
-      // dragCoefficient: 0.99,
-      springLength: 0.05,
-      gravity: -6,
-    });
+    let positions: { [nodeId: string]: { x: number; y: number; z: number } };
+    let degree: { [key: string]: number };
+    let directedBetweenness: { [key: string]: number };
+    let routingPaths: { [edgeKey: string]: string[] } | null;
 
-    var energyHistory = [];
-    while (true) {
-      layout.step();
+    if (cached) {
+      console.log('Cache hit — using cached layout and centrality');
+      positions = cached.positions;
+      degree = cached.degree;
+      directedBetweenness = cached.betweenness;
+      routingPaths = cached.routingPaths;
+    } else {
+      console.log('Cache miss — computing layout and centrality');
 
-      energyHistory.push(layout.getForceVectorLength());
+      const layout = createLayout(graph, {
+        dimensions: 3,
+        springLength: 0.05,
+        gravity: -6,
+      });
 
-      let evaluationRange = energyHistory.slice(
-        energyHistory.length -
-          (energyHistory.length > 5 ? 5 : energyHistory.length)
-      );
-      let latestEnergyChange = evaluationRange
-        .slice(1)
-        .map((value, index) => value - evaluationRange[index]);
-      // const percentChange = (endingEnergy - startingEnergy) / startingEnergy
+      var energyHistory: number[] = [];
+      while (true) {
+        layout.step();
 
-      let meanForceDiff =
-        latestEnergyChange.reduce((acc, value) => acc + value, 0) /
-        latestEnergyChange.length;
+        energyHistory.push(layout.getForceVectorLength());
 
-      if (energyHistory.length % 10 == 0) {
-        console.log({
-          event: 'Layout',
-          step: energyHistory.length,
-          forceVector: energyHistory[energyHistory.length - 1],
-          forceDiff: meanForceDiff,
-          // forcePercent: Math.abs(percentChange),
-        });
+        let evaluationRange = energyHistory.slice(
+          energyHistory.length -
+            (energyHistory.length > 5 ? 5 : energyHistory.length)
+        );
+        let latestEnergyChange = evaluationRange
+          .slice(1)
+          .map((value, index) => value - evaluationRange[index]);
+
+        let meanForceDiff =
+          latestEnergyChange.reduce((acc, value) => acc + value, 0) /
+          latestEnergyChange.length;
+
+        if (energyHistory.length % 10 == 0) {
+          console.log({
+            event: 'Layout',
+            step: energyHistory.length,
+            forceVector: energyHistory[energyHistory.length - 1],
+            forceDiff: meanForceDiff,
+          });
+        }
+
+        if (Math.abs(meanForceDiff) < MAX_ENERGY) {
+          break;
+        }
       }
 
-      if (Math.abs(meanForceDiff) < MAX_ENERGY) {
-        break;
-      }
+      positions = {};
+      graph.forEachNode((node) => {
+        let pos = layout.getNodePosition(node.id);
+        positions[node.id as string] = {
+          x: pos.x,
+          y: pos.y,
+          z: pos.z || 0,
+        };
+      });
+
+      degree = centrality.degree(graph);
+      directedBetweenness = centrality.betweenness(graph, true);
+      routingPaths = null;
     }
 
-    let pathFinder = path.aStar(graph);
+    const degreeValues = Object.values(degree);
+    const maxDegree = degreeValues.reduce((a, b) => (a > b ? a : b), -Infinity);
 
-    var directedBetweenness: { [key: string]: number } = centrality.betweenness(
-      graph,
-      true
+    const sizeInterpolator = generateInterpolator([1, maxDegree], [0.2, 1]);
+
+    const betweennessValues = Object.values(directedBetweenness);
+    const maxBetweenness = betweennessValues.reduce(
+      (a, b) => (a > b ? a : b),
+      -Infinity
     );
-
-    const sizeInterpolator = generateInterpolator(
-      [1, Math.max(...Object.values(degree))],
-      [0.2, 1]
-    );
-
-    const maxBetweenness = Math.max(...Object.values(directedBetweenness));
 
     const interpolator = generateInterpolator([0, maxBetweenness], [1, 2]);
 
-    // const distanceInterpolator = generateInterpolator([0, 3000], [0, 1]);
     let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
     graph.forEachNode((node) => {
-      let position = layout.getNodePosition(node.id);
+      let position = positions[node.id as string];
+      if (!position) return;
 
       if (!node.data) {
         node.data = {};
@@ -350,7 +429,8 @@ export class Demo implements Experience {
       node.data['schema'];
       let metadata = node.data['meta'] || {};
       if (metadata.hasOwnProperty('atlan')) {
-        node.data['owner'] = metadata['atlan']['attributes']['ownerGroups'][0];
+        node.data['owner'] =
+          metadata['atlan']?.['attributes']?.['ownerGroups']?.[0];
       } else if (
         node.data.hasOwnProperty('config') &&
         node.data.config.hasOwnProperty('group') &&
@@ -364,84 +444,104 @@ export class Demo implements Experience {
       let graphNode = new GraphNode(
         node.data.unique_id,
         node.data,
-        interpolator(directedBetweenness[node.id]) *
-          sizeInterpolator(degree[node.id]),
+        interpolator(directedBetweenness[node.id as string]) *
+          sizeInterpolator(degree[node.id as string]),
         new THREE.Color(color),
         {
-          betweenness: directedBetweenness[node.id],
-          degree: degree[node.id],
+          betweenness: directedBetweenness[node.id as string],
+          degree: degree[node.id as string],
         }
       );
 
       graphNode.castShadow = false;
 
-      graphNode.position.set(
-        position.x,
-        position.y,
-        position.z ? position.z : 0
-      );
+      graphNode.position.set(position.x, position.y, position.z);
 
       if (!Object(this.nodes).hasOwnProperty(node.id)) {
-        this.nodes[node.id] = graphNode;
+        this.nodes[node.id as string] = graphNode;
       } else {
         console.error(
           'Found a duplicate injection of ' + node.id,
           graphNode,
-          this.nodes[node.id]
+          this.nodes[node.id as string]
         );
       }
 
       this.engine.scene.add(graphNode);
     });
 
-    manifestGraph.forEachLink((link) => {
-      // We need to map the manifest graph to the power graph. With this in mind, we need to compute pathing
-      // in the power graph between the two ends of the manifest graph link.
-      let sourceNode = graph.getNode(link.fromId);
+    if (routingPaths && Object.keys(routingPaths).length > 0) {
+      manifestGraph.forEachLink((link) => {
+        let sourceNode = graph.getNode(link.fromId);
+        if (!sourceNode) return;
 
-      if (!sourceNode) {
-        return;
-      }
+        let edgeKey = link.fromId + '|' + link.toId;
+        let cachedPath = routingPaths![edgeKey];
+        if (!cachedPath || cachedPath.length < 2) return;
 
-      // let targetNode = graph.getNode(link.toId);
+        let pathObjects = cachedPath.map((id) => this.nodes[id]);
+        if (pathObjects.some((obj) => !obj)) return;
 
-      let routingPath = pathFinder.find(link.fromId, link.toId);
-      let pathObjects = routingPath
-        .map((node) => {
-          return this.nodes[node.id];
-        })
-        .toReversed();
+        let graphEdge = new GraphEdge2(
+          link.id,
+          pathObjects,
+          new THREE.Color(
+            sourceNode.data['resource_type'] == 'source'
+              ? 0xaaaaaa
+              : colorScale(sourceNode.data['owner'])
+          )
+        );
+        this.edges[link.id] = graphEdge;
+        this.engine.scene.add(graphEdge);
+      });
+    } else {
+      routingPaths = {};
+      let pathFinder = path.aStar(graph);
 
-      routingPath.map((item) => {
-        if (!this.nodes.hasOwnProperty(item.id)) {
-          console.error('Nodes is missing the item ' + item.id, item);
-        }
+      manifestGraph.forEachLink((link) => {
+        let sourceNode = graph.getNode(link.fromId);
+        if (!sourceNode) return;
+
+        let foundPath = pathFinder.find(link.fromId, link.toId);
+        if (foundPath.length < 2) return;
+
+        let reversedIds = foundPath
+          .map((node) => node.id as string)
+          .toReversed();
+        routingPaths![link.fromId + '|' + link.toId] = reversedIds;
+
+        let pathObjects = reversedIds.map((id) => this.nodes[id]);
+        if (pathObjects.some((obj) => !obj)) return;
+
+        let graphEdge = new GraphEdge2(
+          link.id,
+          pathObjects,
+          new THREE.Color(
+            sourceNode.data['resource_type'] == 'source'
+              ? 0xaaaaaa
+              : colorScale(sourceNode.data['owner'])
+          )
+        );
+        this.edges[link.id] = graphEdge;
+        this.engine.scene.add(graphEdge);
       });
 
-      // console.log(link, routingPath, pathObjects);
+      this.saveCache(cacheKey, {
+        positions,
+        degree,
+        betweenness: directedBetweenness,
+        routingPaths,
+      });
+    }
 
-      let graphEdge = new GraphEdge2(
-        link.id,
-        pathObjects,
-        new THREE.Color(
-          sourceNode.data['resource_type'] == 'source'
-            ? 0xaaaaaa
-            : colorScale(sourceNode.data['owner'])
-        )
-      );
-      this.edges[link.id] = graphEdge;
-      this.engine.scene.add(graphEdge);
-    });
-
-    // Let's see everything by default! We can do this by measuring the max difference
-    // between nodes and set this as the initial camera position.
     let distances: number[] = [];
-    layout.forEachBody((body) => {
-      let vec = new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z);
+    for (const pos of Object.values(positions)) {
+      let vec = new THREE.Vector3(pos.x, pos.y, pos.z);
       distances.push(vec.length());
-    });
+    }
 
-    this.engine.camera.instance.position.z = Math.max(...distances) * 2;
+    const maxDistance = distances.reduce((a, b) => (a > b ? a : b), 0);
+    this.engine.camera.instance.position.z = maxDistance * 2;
   }
 
   generateGraphFromManifest(manifest: Manifest): Graph<any, any> & EventedType {
@@ -490,11 +590,24 @@ export class Demo implements Experience {
     )[0];
 
     let element = document.getElementsByTagName('h1')[0];
+    let subtitle = document.getElementById('node-owner');
+    if (!subtitle && element?.parentElement) {
+      subtitle = document.createElement('p');
+      subtitle.id = 'node-owner';
+      element.after(subtitle);
+    }
+
     if (!!selected && !!element) {
       let object = selected.object as GraphNode;
       element.textContent = object.nodeData.unique_id;
+      if (subtitle) {
+        subtitle.textContent = object.nodeData.owner || '';
+      }
     } else {
       element.textContent = '';
+      if (subtitle) {
+        subtitle.textContent = '';
+      }
     }
   }
 
@@ -615,28 +728,47 @@ export class Demo implements Experience {
       this.engine.hasUpdated = true;
     }
 
-    Object.values(this.edges).forEach((edge) => {
-      edge.update(delta, this.engine);
+    const hasMoved = this.engine.hasMoved;
+    if (hasMoved) {
+      this.engine.raycaster.updateFrustum();
+    }
 
-      if (this.engine.hasMoved) {
+    const OPACITY_THRESHOLD = 0.02;
+    const visibleNodes = new Set<GraphNode>();
+
+    Object.values(this.edges).forEach((edge) => {
+      if (hasMoved) {
         if (
           !this.engine.raycaster.isSeen(edge.source) &&
           !this.engine.raycaster.isSeen(edge.target)
         ) {
-          let object = edge.children[0] as THREE.Line;
-
-          if (object.material instanceof THREE.Material) {
-            object.material.opacity = 0.01;
-          } else {
-            object.material[0].opacity = 0.01;
-          }
+          edge.visible = false;
         } else {
+          edge.visible = true;
           edge.updateEdgeOpacity(this.engine);
-          edge.source.updateDistance(this.engine);
-          edge.target.updateDistance(this.engine);
+
+          // Hide edges with very low opacity (zoomed out)
+          const lineChild = edge.children[0] as THREE.Line;
+          const mat = lineChild.material as THREE.Material;
+          if (mat.opacity < OPACITY_THRESHOLD && !edge.selected) {
+            edge.visible = false;
+          } else {
+            visibleNodes.add(edge.source);
+            visibleNodes.add(edge.target);
+          }
         }
       }
+
+      if (edge.visible) {
+        edge.update(delta, this.engine);
+      }
     });
+
+    if (hasMoved) {
+      for (const node of visibleNodes) {
+        node.updateDistance(this.engine);
+      }
+    }
 
     this.engine.hasMoved = false;
   }

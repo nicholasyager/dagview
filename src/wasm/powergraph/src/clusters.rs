@@ -8,6 +8,7 @@ use crate::{sets::Set, unordered_tuple::UnorderedTuple};
 pub struct Cluster {
     pub items: Set<String>,
     neighbors: Set<String>,
+    id: String,
 }
 
 impl std::hash::Hash for Cluster {
@@ -36,9 +37,16 @@ impl Cluster {
     pub fn new(items: Set<String>, neighbors: Set<String>) -> Cluster {
         let neighbor_items = neighbors.difference(&items).to_owned();
 
+        let id = {
+            let mut values: Vec<&String> = items.items.iter().collect();
+            values.sort();
+            values.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join("-")
+        };
+
         Cluster {
             items: items.clone(),
             neighbors: neighbor_items,
+            id,
         }
     }
 
@@ -83,8 +91,8 @@ impl Cluster {
         let parents = self.neighbors.difference(&other_cluster.neighbors);
 
         Cluster::new(
-            Set::from_set(items.iter().map(|i| i.clone()).collect()),
-            Set::from_set(parents.iter().map(|i| i.clone()).collect()),
+            Set::from_set(items.into_iter().cloned().collect()),
+            Set::from_set(parents.into_iter().cloned().collect()),
         )
     }
 
@@ -103,17 +111,8 @@ impl Cluster {
         self.neighbors.insert(neighbor);
     }
 
-    pub fn get_id(&self) -> String {
-        let mut values = self
-            .items
-            .to_vec()
-            .into_iter()
-            .map(|item| item.to_string())
-            .collect::<Vec<String>>();
-
-        values.sort();
-
-        return values.join("-").clone();
+    pub fn get_id(&self) -> &str {
+        &self.id
     }
 
     pub fn get_neighbors(&self) -> Vec<String> {
@@ -150,8 +149,8 @@ pub fn generate_comparison_set(clusters: &Vec<Cluster>) -> Set<UnorderedTuple<St
             }
 
             comparison_set.insert(UnorderedTuple {
-                one: cluster.get_id().to_string(),
-                two: comparison_cluster.get_id().to_string(),
+                one: cluster.get_id().to_owned(),
+                two: comparison_cluster.get_id().to_owned(),
             });
         }
     }

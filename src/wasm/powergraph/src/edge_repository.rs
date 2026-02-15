@@ -82,17 +82,19 @@ impl EdgeRepository {
         nodes
             .iter()
             .filter_map(
-                |source_node: String| match self.child_map.get(&source_node) {
-                    Some(source) => return Some((source_node, source)),
-                    None => return None,
+                |source_node| match self.child_map.get(source_node) {
+                    Some(targets) => Some((source_node, targets)),
+                    None => None,
                 },
             )
             .flat_map(|(source, target_set)| {
-                let common_targets = Set::from_set(target_set.clone()).intersection(nodes);
-                common_targets.iter().map(move |target| Edge {
-                    from: source.to_string(),
-                    to: target,
-                })
+                target_set
+                    .iter()
+                    .filter(|target| nodes.items.contains(*target))
+                    .map(move |target| Edge {
+                        from: source.clone(),
+                        to: target.clone(),
+                    })
             })
             .collect()
     }

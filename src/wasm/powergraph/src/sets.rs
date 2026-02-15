@@ -28,24 +28,6 @@ impl<T: Eq + Hash + Ord> std::hash::Hash for Set<T> {
     }
 }
 
-pub struct SetIterator<T: Hash + Eq> {
-    set: Vec<T>,
-    index: usize,
-}
-
-impl<'a, T: Hash + Eq + Clone> Iterator for SetIterator<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.set.len() {
-            let result = &self.set[self.index].clone();
-            self.index += 1;
-            Some(result.clone())
-        } else {
-            None
-        }
-    }
-}
 
 impl<'a, T: std::cmp::PartialEq + Clone + Hash + Eq> Set<&T> {
     pub fn to_owned(&'a self) -> Set<T> {
@@ -83,9 +65,8 @@ impl<'a, T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
         self.items.insert(item);
     }
 
-    // TODO: Use a reference to T and not T itself.
-    pub fn contains(&self, item: T) -> bool {
-        return self.items.contains(&item);
+    pub fn contains(&self, item: &T) -> bool {
+        return self.items.contains(item);
     }
 
     pub fn intersection(&self, other_cluster: &Set<T>) -> Set<T> {
@@ -141,13 +122,8 @@ impl<'a, T: std::cmp::PartialEq + Clone + Hash + Eq> Set<T> {
         return self.items.clone().into_iter().collect::<Vec<T>>();
     }
 
-    pub fn iter(&self) -> SetIterator<T> {
-        let list = self.items.clone().into_iter().collect::<Vec<T>>();
-        let iterator = SetIterator {
-            set: list.clone(),
-            index: 0,
-        };
-        return iterator;
+    pub fn iter(&self) -> std::collections::hash_set::Iter<'_, T> {
+        self.items.iter()
     }
 }
 

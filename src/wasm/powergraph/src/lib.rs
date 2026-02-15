@@ -6,7 +6,7 @@ mod similarity_matrix;
 mod unordered_tuple;
 mod utils;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -181,10 +181,18 @@ impl PartialEq for PowerEdgeCandidate {
     }
 }
 
-impl Eq for PowerEdgeCandidate {
-    // fn eq(&self, other: &Self) -> bool {
-    //     self.from == other.from && self.to == other.to && self.size == other.size
-    // }
+impl Eq for PowerEdgeCandidate {}
+
+impl PartialOrd for PowerEdgeCandidate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PowerEdgeCandidate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        ((self.size * 10000.0) as u32).cmp(&((other.size * 10000.0) as u32))
+    }
 }
 
 #[derive(Debug)]
@@ -231,29 +239,21 @@ impl PowerGraph {
         self.edges.get_edge(from, to)
     }
 
-    fn find_power_node(&self, search_id: &str, power_nodes: Vec<PowerNode>) -> Option<PowerNode> {
-        let candidates = power_nodes
-            .into_iter()
-            .filter(|power_node| power_node.id == search_id)
-            .collect::<Vec<PowerNode>>();
-
-        match candidates.first() {
-            Some(power_node) => return Some(power_node.clone()),
-            None => return None,
-        }
+    fn find_power_node(&self, search_id: &str) -> Option<&PowerNode> {
+        self.power_nodes.iter().find(|pn| pn.id == search_id)
     }
 
     fn expand_power_edge(&self, power_edge: &PowerEdge) -> Option<Vec<Edge>> {
-        let source_power_node: PowerNode = self
-            .find_power_node(&power_edge.from, self.power_nodes.clone())
+        let source_power_node = self
+            .find_power_node(&power_edge.from)
             .unwrap();
-        let target_power_node: PowerNode = self
-            .find_power_node(&power_edge.to, self.power_nodes.clone())
+        let target_power_node = self
+            .find_power_node(&power_edge.to)
             .unwrap();
 
         console_debug!("{:?} ", power_edge);
         console_debug!("{:?} -> {:?}", source_power_node, target_power_node);
-        let target_items: Vec<String> = target_power_node.cluster.items.into_iter().collect();
+        let target_items: Vec<&String> = target_power_node.cluster.items.iter().collect();
         let edges: Vec<Edge> = source_power_node
             .cluster
             .items
@@ -261,7 +261,7 @@ impl PowerGraph {
             .cartesian_product(target_items.into_iter())
             .map(|item| {
                 console_debug!("{:?}", item);
-                return Edge::new(&item.0, &item.1);
+                return Edge::new(item.0, item.1);
             })
             .collect();
 
@@ -377,8 +377,8 @@ impl PowerGraph {
             let similarity = cluster.similarity(&comparison_cluster);
             similarity_matrix.set_similarity(
                 UnorderedTuple {
-                    one: cluster.get_id(),
-                    two: comparison_cluster.get_id(),
+                    one: cluster.get_id().to_string(),
+                    two: comparison_cluster.get_id().to_string(),
                 },
                 similarity,
             );
@@ -411,18 +411,18 @@ impl PowerGraph {
 
             // console_debug!("{:?} <-> {:?}", cluster, comparison_cluster);
 
-            c_prime.remove(&cluster.get_id());
-            c_prime.remove(&comparison_cluster.get_id());
+            c_prime.remove(&cluster.get_id().to_string());
+            c_prime.remove(&comparison_cluster.get_id().to_string());
 
-            similarity_matrix.remove_element(cluster.get_id());
-            similarity_matrix.remove_element(comparison_cluster.get_id());
+            similarity_matrix.remove_element(cluster.get_id().to_string());
+            similarity_matrix.remove_element(comparison_cluster.get_id().to_string());
 
             let unioned_cluster = cluster.clone().union(&comparison_cluster);
 
             // Add new cluster to everything!
             cluster_repository.add_cluster(&unioned_cluster);
             c_prime.add_cluster(&unioned_cluster);
-            cluster_map.insert(unioned_cluster.get_id(), unioned_cluster.clone());
+            cluster_map.insert(unioned_cluster.get_id().to_string(), unioned_cluster.clone());
 
             // Calculate new similarities for the added element.
 
@@ -437,8 +437,8 @@ impl PowerGraph {
                 let similarity = unioned_cluster.similarity(&comparison_cluster);
                 similarity_matrix.set_similarity(
                     UnorderedTuple {
-                        one: unioned_cluster.get_id(),
-                        two: comparison_cluster.get_id(),
+                        one: unioned_cluster.get_id().to_string(),
+                        two: comparison_cluster.get_id().to_string(),
                     },
                     similarity,
                 );
@@ -450,7 +450,9 @@ impl PowerGraph {
 
         // Add first and second order neighborhoods as clusters in `c`.
 
-        for cluster in cluster_repository.clusters.clone().into_values() {
+        let cluster_keys: Vec<String> = cluster_repository.clusters.keys().cloned().collect();
+        for cluster_key in &cluster_keys {
+            let cluster = cluster_repository.clusters.get(cluster_key).unwrap().clone();
             let items = cluster.get_neighbors();
             let neighbors = items
                 .iter()
@@ -473,7 +475,9 @@ impl PowerGraph {
         }
 
         // Do it again for second-order neighbors.
-        for cluster in cluster_repository.clusters.clone().into_values() {
+        let cluster_keys: Vec<String> = cluster_repository.clusters.keys().cloned().collect();
+        for cluster_key in &cluster_keys {
+            let cluster = cluster_repository.clusters.get(cluster_key).unwrap().clone();
             let items = cluster.get_neighbors();
             let neighbors = items
                 .iter()
@@ -488,26 +492,26 @@ impl PowerGraph {
             }
         }
 
-        for cluster in cluster_repository.clusters.clone().into_values() {
-            if cluster.get_items().len() > 1 {
-                continue;
-            }
-
-            console_debug!(
-                "{:?} is a singleton. Adding to PowerNodes.",
-                cluster.get_id()
-            );
-
-            let singleton = PowerNode {
-                id: cluster.get_id(),
-                cluster,
-            };
-
-            self.power_nodes.push(singleton)
-        }
+        let singletons: Vec<PowerNode> = cluster_repository
+            .clusters
+            .values()
+            .filter(|cluster| cluster.size() <= 1)
+            .map(|cluster| {
+                console_debug!(
+                    "{:?} is a singleton. Adding to PowerNodes.",
+                    cluster.get_id()
+                );
+                PowerNode {
+                    id: cluster.get_id().to_string(),
+                    cluster: cluster.clone(),
+                }
+            })
+            .collect();
+        self.power_nodes.extend(singletons);
 
         // Generate candidates for PowerEdges
-        let mut edge_candidates: Vec<PowerEdgeCandidate> = Vec::new();
+        let mut edge_candidates: BinaryHeap<PowerEdgeCandidate> = BinaryHeap::new();
+        let mut queued_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
 
         // console_log!("Generating pairs of clusters to evaluate.",);
 
@@ -578,13 +582,13 @@ impl PowerGraph {
 
                 let edges = self.subgraph(&node_union);
 
-                edge_candidates.push({
-                    PowerEdgeCandidate {
-                        from: cluster_one.clone(),
-                        to: cluster_two.clone(),
-                        size: edges.len() as f32,
-                    }
-                })
+                let candidate = PowerEdgeCandidate {
+                    from: cluster_one.clone(),
+                    to: cluster_two.clone(),
+                    size: edges.len() as f32,
+                };
+                queued_candidates.insert(candidate.clone());
+                edge_candidates.push(candidate);
             }
 
             if cluster_one == cluster_two && self.clusters_are_clique(&cluster_one, &cluster_two) {
@@ -595,13 +599,13 @@ impl PowerGraph {
                 // );
 
                 let edges = self.subgraph(&node_union);
-                edge_candidates.push({
-                    PowerEdgeCandidate {
-                        from: cluster_one.clone(),
-                        to: cluster_two.clone(),
-                        size: edges.len() as f32 / 2_f32,
-                    }
-                })
+                let candidate = PowerEdgeCandidate {
+                    from: cluster_one.clone(),
+                    to: cluster_two.clone(),
+                    size: edges.len() as f32 / 2_f32,
+                };
+                queued_candidates.insert(candidate.clone());
+                edge_candidates.push(candidate);
             }
         }
 
@@ -609,11 +613,7 @@ impl PowerGraph {
 
         let mut completed_candidates: HashSet<PowerEdgeCandidate> = HashSet::new();
 
-        while edge_candidates.len() > 0 {
-            edge_candidates.sort_by_key(|item| (item.size * 10000_f32) as u32);
-
-            let edge_candidate = edge_candidates.pop().unwrap();
-
+        while let Some(edge_candidate) = edge_candidates.pop() {
             let candidate_processor_results =
                 self.process_edge_candidate(&edge_candidate, &cluster_repository);
 
@@ -628,17 +628,18 @@ impl PowerGraph {
                         }
 
                         // Don't process invalid edges
-                        if candidate.from.get_id() == "" || candidate.to.get_id() == "" {
+                        if candidate.from.get_id().is_empty() || candidate.to.get_id().is_empty() {
                             continue;
                         }
 
                         cluster_repository.add_cluster(&candidate.from);
                         cluster_repository.add_cluster(&candidate.to);
 
-                        if !edge_candidates.contains(&candidate) {
+                        if !queued_candidates.contains(&candidate) {
+                            queued_candidates.insert(candidate.clone());
                             edge_candidates.push(candidate.clone());
                         }
-                        completed_candidates.insert(candidate.clone());
+                        completed_candidates.insert(candidate);
                     }
                     PowerEdgeCandidateProcessorOutput::NewPowerNode(power_node) => {
                         // console_log!("Power Node found: {:?}", power_node);
@@ -658,24 +659,22 @@ impl PowerGraph {
 
         // For all remaining edges not yet covered by power edges, create new power edges.
         console_debug!("PowerEdges: {:?}", self.power_edges);
-        let covered_edges: Vec<Edge> = self
-            .power_edges
-            .iter()
-            .map(|power_edge| return self.expand_power_edge(power_edge).unwrap())
-            .flatten()
-            .collect();
+        let mut covered_edges: HashSet<(String, String)> = HashSet::new();
+        for power_edge in self.power_edges.iter() {
+            if let Some(edges) = self.expand_power_edge(power_edge) {
+                for edge in edges {
+                    covered_edges.insert((edge.from.clone(), edge.to.clone()));
+                    covered_edges.insert((edge.to, edge.from));
+                }
+            }
+        }
 
         console_debug!("Covered edges: {:?}", covered_edges);
         for edge in self.edges.clone().into_iter() {
-            if !covered_edges.contains(&edge)
-                && !covered_edges.contains(&Edge {
-                    from: edge.to.clone(),
-                    to: edge.from.clone(),
-                })
-            {
+            if !covered_edges.contains(&(edge.from.clone(), edge.to.clone())) {
                 self.power_edges.push(PowerEdge {
-                    from: edge.from.clone(),
-                    to: edge.to.clone(),
+                    from: edge.from,
+                    to: edge.to,
                 })
             }
         }
@@ -831,6 +830,10 @@ impl PowerGraph {
 
         // let cluster_subgraph = self.subgraph(&power_edge_nodes);
 
+        // Hoist candidate-only computation outside the filter loop.
+        let candidate_union = edge_candidate.from.clone().union(&edge_candidate.to);
+        let candidate_subgraph = Set::from_iter(self.subgraph(&candidate_union.items));
+
         let overlapping_power_edges: Vec<&PowerEdge> = self
             .power_edges
             .iter()
@@ -849,10 +852,7 @@ impl PowerGraph {
                 };
 
                 // Check if (UxW) intersects with (SxT).
-                let candidate_union = edge_candidate.from.clone().union(&edge_candidate.to);
                 let comparison_union = s.clone().union(&t);
-
-                let candidate_subgraph = Set::from_iter(self.subgraph(&candidate_union.items));
                 let comparison_subgraph = Set::from_iter(self.subgraph(&comparison_union.items));
 
                 let edge_intersection = candidate_subgraph.intersection(&comparison_subgraph);
@@ -870,10 +870,7 @@ impl PowerGraph {
                 let s = cluster_repository.get(&power_edge.from).unwrap();
                 let t = cluster_repository.get(&power_edge.to).unwrap();
 
-                let candidate_union = edge_candidate.from.clone().union(&edge_candidate.to);
                 let comparison_union = s.clone().union(&t);
-
-                let candidate_subgraph = Set::from_iter(self.subgraph(&candidate_union.items));
                 let comparison_subgraph = Set::from_iter(self.subgraph(&comparison_union.items));
 
                 let covers_all_edges = candidate_subgraph.is_proper_subset_of(&comparison_subgraph);
@@ -956,31 +953,34 @@ impl PowerGraph {
         }
 
         if edge_candidate.to == edge_candidate.from {
+            let id = edge_candidate.to.get_id().to_string();
             return vec![
                 PowerEdgeCandidateProcessorOutput::NewPowerNode(PowerNode {
-                    id: edge_candidate.to.get_id(),
+                    id: id.clone(),
                     cluster: edge_candidate.to.clone(),
                 }),
                 PowerEdgeCandidateProcessorOutput::NewPowerEdge(PowerEdge {
-                    from: edge_candidate.to.get_id(),
-                    to: edge_candidate.to.get_id(),
+                    from: id.clone(),
+                    to: id,
                 }),
             ];
         }
 
         // Otherwise, add power nodes for `from` and `to`, and a power edge between them.
+        let from_id = edge_candidate.from.get_id().to_string();
+        let to_id = edge_candidate.to.get_id().to_string();
         return vec![
             PowerEdgeCandidateProcessorOutput::NewPowerNode(PowerNode {
-                id: edge_candidate.from.get_id(),
+                id: from_id.clone(),
                 cluster: edge_candidate.from.clone(),
             }),
             PowerEdgeCandidateProcessorOutput::NewPowerNode(PowerNode {
-                id: edge_candidate.to.get_id(),
+                id: to_id.clone(),
                 cluster: edge_candidate.to.clone(),
             }),
             PowerEdgeCandidateProcessorOutput::NewPowerEdge(PowerEdge {
-                from: edge_candidate.from.get_id(),
-                to: edge_candidate.to.get_id(),
+                from: from_id,
+                to: to_id,
             }),
         ];
     }

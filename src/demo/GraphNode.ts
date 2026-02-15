@@ -38,7 +38,7 @@ export class GraphNode extends THREE.Mesh {
       geometry = new THREE.SphereGeometry(radius);
     }
 
-    const material = new THREE.MeshPhysicalMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color: color.getHex(),
       emissive: color.getHex(),
       emissiveIntensity: MIN_EMISSIVITY,
@@ -46,8 +46,8 @@ export class GraphNode extends THREE.Mesh {
 
     super(geometry, material);
     this.name = uniqueId;
-    this.castShadow = true; //default is false
-    this.receiveShadow = true; //default
+    this.castShadow = false;
+    this.receiveShadow = false;
     this.selected = false;
     this.dimmed = false;
 
@@ -87,27 +87,26 @@ export class GraphNode extends THREE.Mesh {
       // minLineOpacity,
     ])(percentDistance);
 
-    this.material.setValues({ emissiveIntensity: opacity });
+    (this.material as THREE.MeshStandardMaterial).emissiveIntensity = opacity;
   }
 
   select() {
     this.selected = true;
-
-    this.material.setValues({ emissiveIntensity: 1 });
+    (this.material as THREE.MeshStandardMaterial).emissiveIntensity = 1;
   }
 
   deselect() {
     this.selected = false;
-    this.material.setValues({ emissiveIntensity: MIN_EMISSIVITY });
+    (this.material as THREE.MeshStandardMaterial).emissiveIntensity = MIN_EMISSIVITY;
   }
 
   dim() {
     this.dimmed = true;
-    this.material.setValues({ emissiveIntensity: 0.05 });
+    (this.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.05;
   }
 
   dedim() {
     this.dimmed = false;
-    this.material.setValues({ emissiveIntensity: MIN_EMISSIVITY });
+    (this.material as THREE.MeshStandardMaterial).emissiveIntensity = MIN_EMISSIVITY;
   }
 }
