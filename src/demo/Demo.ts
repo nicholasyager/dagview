@@ -166,8 +166,8 @@ export class Demo implements Experience {
       try {
         const partial: CachedLayout = {
           positions: data.positions,
-          degree: data.degree,
-          betweenness: data.betweenness,
+          degree: {},
+          betweenness: {},
           routingPaths: {},
         };
         localStorage.setItem(key, JSON.stringify(partial, roundingReplacer));
@@ -348,6 +348,20 @@ export class Demo implements Experience {
       degree = cached.degree;
       directedBetweenness = cached.betweenness;
       routingPaths = cached.routingPaths;
+
+      // Recompute centrality if the cache is missing values for any node.
+      let missing = false;
+      graph.forEachNode((node) => {
+        const id = node.id as string;
+        if (!(id in degree) || !(id in directedBetweenness)) {
+          missing = true;
+        }
+      });
+      if (missing) {
+        console.log('Cache stale — recomputing centrality');
+        degree = centrality.degree(graph);
+        directedBetweenness = centrality.betweenness(graph, true);
+      }
     } else {
       console.log('Cache miss — computing layout and centrality');
 
