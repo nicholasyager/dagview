@@ -18,7 +18,7 @@ import centrality from 'ngraph.centrality';
 import createGraph, { Graph, Link, Node as NGraphNode } from 'ngraph.graph';
 import path from 'ngraph.path';
 import { EventedType } from 'ngraph.events';
-import { GraphEdge2 } from './GraphEdge';
+import { BatchedEdgeRenderer, EdgeDef } from './BatchedEdgeRenderer';
 
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
@@ -96,7 +96,7 @@ export class Demo implements Experience {
   // graph: Graph<any, any> & EventedType;
   // layout: Layout<any>;
   nodes: { [key: string]: GraphNode };
-  edges: { [key: string]: GraphEdge2 };
+  edgeBatch!: BatchedEdgeRenderer;
   iterations: number;
   selectedNodes: number[];
   manifestGraph: Graph | undefined;
@@ -122,7 +122,6 @@ export class Demo implements Experience {
 
   constructor(private engine: Engine) {
     this.nodes = {};
-    this.edges = {};
     this.iterations = 0;
     this.selectedNodes = [];
     this.manifestGraph = undefined;
@@ -475,6 +474,7 @@ export class Demo implements Experience {
     }
 
     // Second pass: create graph nodes.
+    console.log('Creating graph nodes...');
     graph.forEachNode((node) => {
       let position = positions[node.id as string];
       if (!position) return;
@@ -510,6 +510,9 @@ export class Demo implements Experience {
       this.engine.scene.add(graphNode);
     });
 
+    console.log('Collecting edge definitions...');
+    const edgeDefs: EdgeDef[] = [];
+
     if (routingPaths && Object.keys(routingPaths).length > 0) {
       manifestGraph.forEachLink((link) => {
         let sourceNode = graph.getNode(link.fromId);
@@ -522,16 +525,15 @@ export class Demo implements Experience {
         let pathObjects = cachedPath.map((id) => this.nodes[id]);
         if (pathObjects.some((obj) => !obj)) return;
 
-        let graphEdge = new GraphEdge2(
-          link.id,
+        edgeDefs.push({
+          id: link.id,
           pathObjects,
-          new THREE.Color(getOwnerColor(sourceNode.data['owner']))
-        );
-        this.edges[link.id] = graphEdge;
-        this.engine.scene.add(graphEdge);
+          color: new THREE.Color(getOwnerColor(sourceNode.data['owner'])),
+        });
       });
     } else {
       routingPaths = {};
+      console.log('Computing A* routing paths...');
       let pathFinder = path.aStar(graph);
 
       manifestGraph.forEachLink((link) => {
@@ -549,13 +551,11 @@ export class Demo implements Experience {
         let pathObjects = reversedIds.map((id) => this.nodes[id]);
         if (pathObjects.some((obj) => !obj)) return;
 
-        let graphEdge = new GraphEdge2(
-          link.id,
+        edgeDefs.push({
+          id: link.id,
           pathObjects,
-          new THREE.Color(getOwnerColor(sourceNode.data['owner']))
-        );
-        this.edges[link.id] = graphEdge;
-        this.engine.scene.add(graphEdge);
+          color: new THREE.Color(getOwnerColor(sourceNode.data['owner'])),
+        });
       });
 
       this.saveCache(cacheKey, {
@@ -565,6 +565,12 @@ export class Demo implements Experience {
         routingPaths,
       });
     }
+
+    console.log(`Building batched edge renderer (${edgeDefs.length} edges)...`);
+    this.edgeBatch = new BatchedEdgeRenderer();
+    this.edgeBatch.build(edgeDefs);
+    this.engine.scene.add(this.edgeBatch.mesh);
+    console.log('Edge batch ready');
 
     let distances: number[] = [];
     for (const pos of Object.values(positions)) {
@@ -648,9 +654,7 @@ export class Demo implements Experience {
       containedSelection = false;
     }
 
-    Object.values(this.edges).forEach((edge) => {
-      edge.dim();
-    });
+    this.edgeBatch.dimAll();
 
     Object.values(this.nodes).forEach((node) => {
       node.dim();
@@ -666,49 +670,39 @@ export class Demo implements Experience {
       if (!!selectedObject) {
         selectedObject.select();
 
-        // Find all edges and select those, too!
-        let childEdges = this.engine.scene.getObjectsByProperty(
-          'source',
-          selectedObject
-        ) as GraphEdge2[];
-        let parentEdges = this.engine.scene.getObjectsByProperty(
-          'target',
-          selectedObject
-        ) as GraphEdge2[];
+        let edges = this.edgeBatch.getEdgesForNode(selectedObject);
 
-        let edges = childEdges.concat(parentEdges);
-
-        edges.forEach((edge) => {
+        edges.forEach((edgeRecord) => {
           if (containedSelection) {
             if (
-              !selectedNodeIds.has(edge.source.id) ||
-              !selectedNodeIds.has(edge.target.id)
+              !selectedNodeIds.has(edgeRecord.source.id) ||
+              !selectedNodeIds.has(edgeRecord.target.id)
             ) {
               return;
             }
           }
-          edge.select();
-          edge.dedim();
+          this.edgeBatch.selectEdge(edgeRecord.id, this.engine.scene);
+          this.edgeBatch.dedimEdge(edgeRecord.id);
 
-          edge.source.dedim();
-          edge.target.dedim();
-
-          this.selectedNodes.push(edge.id);
+          edgeRecord.source.dedim();
+          edgeRecord.target.dedim();
         });
       }
     });
   }
 
   clearSelections() {
-    this.selectedNodes.forEach((node) => {
-      let selectedObject: GraphNode | undefined =
-        this.engine.scene.getObjectById(node) as GraphNode;
-      selectedObject.deselect();
+    this.selectedNodes.forEach((nodeId) => {
+      let selectedObject = this.engine.scene.getObjectById(nodeId) as
+        | GraphNode
+        | undefined;
+      if (selectedObject) {
+        selectedObject.deselect();
+      }
     });
 
-    Object.values(this.edges).forEach((edge) => {
-      edge.dedim();
-    });
+    this.edgeBatch.deselectAll(this.engine.scene);
+    this.edgeBatch.dedimAll();
 
     Object.values(this.nodes).forEach((node) => {
       node.dedim();
@@ -756,47 +750,29 @@ export class Demo implements Experience {
 
   update(delta: number) {
     this.engine.hasUpdated = false;
-    if (this.selectedNodes.length > 0) {
+    if (!this.edgeBatch) return;
+    if (
+      this.selectedNodes.length > 0 ||
+      this.edgeBatch.activeSelections.size > 0
+    ) {
       this.engine.hasUpdated = true;
     }
 
     const hasMoved = this.engine.hasMoved;
     if (hasMoved) {
       this.engine.raycaster.updateFrustum();
+      this.edgeBatch.updateOpacities(this.engine);
     }
 
-    const OPACITY_THRESHOLD = 0.02;
-    const visibleNodes = new Set<GraphNode>();
-
-    Object.values(this.edges).forEach((edge) => {
-      if (hasMoved) {
-        if (
-          !this.engine.raycaster.isSeen(edge.source) &&
-          !this.engine.raycaster.isSeen(edge.target)
-        ) {
-          edge.visible = false;
-        } else {
-          edge.visible = true;
-          edge.updateEdgeOpacity(this.engine);
-
-          // Hide edges with very low opacity (zoomed out)
-          const lineChild = edge.children[0] as THREE.Line;
-          const mat = lineChild.material as THREE.Material;
-          if (mat.opacity < OPACITY_THRESHOLD && !edge.selected) {
-            edge.visible = false;
-          } else {
-            visibleNodes.add(edge.source);
-            visibleNodes.add(edge.target);
-          }
-        }
-      }
-
-      if (edge.visible) {
-        edge.update(delta, this.engine);
-      }
-    });
+    // Update standalone selected edges (particle animation)
+    for (const standalone of this.edgeBatch.activeSelections.values()) {
+      standalone.update(delta, this.engine);
+      standalone.updateEdgeOpacity(this.engine);
+    }
 
     if (hasMoved) {
+      const OPACITY_THRESHOLD = 0.02;
+      const visibleNodes = this.edgeBatch.getVisibleNodes(OPACITY_THRESHOLD);
       for (const node of visibleNodes) {
         node.updateDistance(this.engine);
       }

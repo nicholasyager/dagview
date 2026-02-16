@@ -9,6 +9,7 @@ export interface GraphNodeStatistics {
 }
 
 const MIN_EMISSIVITY = 0.5;
+const nodeEmissiveInterp = d3.interpolateBasis([0.05, 1]);
 
 export class GraphNode extends THREE.Mesh {
   uniqueId: string;
@@ -62,13 +63,6 @@ export class GraphNode extends THREE.Mesh {
   updateDistance(engine: Engine) {
     if (this.selected || this.dimmed) return;
 
-    // if (!engine.raycaster.isSeen(this)) {
-    //   return;
-    // }
-
-    const minLineOpacity = 0.05;
-    // const maxLineOpacity = 0.3;
-
     const zoom = engine.camera.instance.position.distanceTo(
       engine.camera.controls.target
     );
@@ -80,12 +74,7 @@ export class GraphNode extends THREE.Mesh {
       percentDistance = 1;
     }
 
-    let opacity = d3.interpolateBasis([
-      minLineOpacity,
-
-      1,
-      // minLineOpacity,
-    ])(percentDistance);
+    let opacity = nodeEmissiveInterp(percentDistance);
 
     (this.material as THREE.MeshStandardMaterial).emissiveIntensity = opacity;
   }
