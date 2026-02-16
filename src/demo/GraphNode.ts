@@ -17,6 +17,7 @@ export class GraphNode extends THREE.Mesh {
 
   selected: boolean;
   dimmed: boolean;
+  hidden: boolean;
 
   constructor(
     uniqueId: string,
@@ -51,6 +52,7 @@ export class GraphNode extends THREE.Mesh {
     this.receiveShadow = false;
     this.selected = false;
     this.dimmed = false;
+    this.hidden = false;
 
     this.uniqueId = uniqueId;
     this.nodeData = nodeData;
@@ -97,5 +99,17 @@ export class GraphNode extends THREE.Mesh {
   dedim() {
     this.dimmed = false;
     (this.material as THREE.MeshStandardMaterial).emissiveIntensity = MIN_EMISSIVITY;
+  }
+
+  hide() {
+    this.hidden = true;
+    this.visible = false;
+  }
+
+  show() {
+    this.hidden = false;
+    if (this.nodeData.resource_type !== 'cluster') {
+      this.visible = true;
+    }
   }
 }

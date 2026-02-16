@@ -207,7 +207,9 @@ export class BatchedEdgeRenderer {
         lineOpacity = lineOpacity / zoom;
       }
 
-      if (!isNodeVisible(record.source) && !isNodeVisible(record.target)) {
+      if (record.source.hidden || record.target.hidden) {
+        lineOpacity = 0;
+      } else if (!isNodeVisible(record.source) && !isNodeVisible(record.target)) {
         lineOpacity = 0;
       }
 

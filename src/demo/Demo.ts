@@ -23,6 +23,7 @@ import { BatchedEdgeRenderer, EdgeDef } from './BatchedEdgeRenderer';
 import * as d3 from 'd3';
 import { RaycasterEvent } from '../engine/Raycaster';
 import { Selector } from '../engine/interface/SearchUI';
+import { OwnerFilterUI } from '../engine/interface/OwnerFilterUI';
 
 type CachedLayout = {
   positions: { [nodeId: string]: { x: number; y: number; z: number } };
@@ -100,6 +101,7 @@ export class Demo implements Experience {
   iterations: number;
   selectedNodes: number[];
   manifestGraph: Graph | undefined;
+  ownerFilterUI: OwnerFilterUI | undefined;
 
   resources: Resource[] = [
     {
@@ -571,6 +573,23 @@ export class Demo implements Experience {
     this.edgeBatch.build(edgeDefs);
     this.engine.scene.add(this.edgeBatch.mesh);
     console.log('Edge batch ready');
+
+    // Owner filter UI
+    this.ownerFilterUI = new OwnerFilterUI(ownerColorMap);
+    this.ownerFilterUI.on('filter', (e: { enabledOwners: Set<string> }) => {
+      const enabledOwners = e.enabledOwners;
+      for (const node of Object.values(this.nodes)) {
+        const owner = (node.nodeData as any).owner;
+        const ownerKey = owner == null ? 'undefined' : owner;
+        if (enabledOwners.has(ownerKey)) {
+          node.show();
+        } else {
+          node.hide();
+        }
+      }
+      this.engine.hasUpdated = true;
+      this.engine.hasMoved = true;
+    });
 
     let distances: number[] = [];
     for (const pos of Object.values(positions)) {
