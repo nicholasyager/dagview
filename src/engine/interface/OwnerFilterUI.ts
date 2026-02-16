@@ -15,13 +15,20 @@ export class OwnerFilterUI extends EventEmitter {
     this.enabledOwners = new Set(allKeys);
 
     const container = document.createElement('div');
-    container.classList.add('owner-filter-container');
+    container.classList.add('owner-filter-container', 'collapsed');
 
-    // Title
+    // Title (clickable to toggle expand/collapse)
     const title = document.createElement('div');
     title.classList.add('owner-filter-title');
     title.textContent = 'Owner Groups';
+    title.addEventListener('click', () => {
+      container.classList.toggle('collapsed');
+    });
     container.appendChild(title);
+
+    // Collapsible body
+    const body = document.createElement('div');
+    body.classList.add('owner-filter-body');
 
     // All / None actions
     const actions = document.createElement('div');
@@ -37,7 +44,7 @@ export class OwnerFilterUI extends EventEmitter {
 
     actions.appendChild(allLink);
     actions.appendChild(noneLink);
-    container.appendChild(actions);
+    body.appendChild(actions);
 
     // Owner rows
     const list = document.createElement('div');
@@ -74,7 +81,8 @@ export class OwnerFilterUI extends EventEmitter {
       this.checkboxes.set(ownerKey, checkbox);
     }
 
-    container.appendChild(list);
+    body.appendChild(list);
+    container.appendChild(body);
     document.body.appendChild(container);
   }
 

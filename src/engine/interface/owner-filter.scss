@@ -24,6 +24,28 @@
   .owner-filter-title {
     font-weight: bold;
     margin-bottom: 6px;
+    cursor: pointer;
+
+    &::before {
+      content: '\25B6';
+      display: inline-block;
+      margin-right: 6px;
+      font-size: 0.7em;
+      transition: transform 0.2s ease;
+    }
+  }
+
+  &:not(.collapsed) .owner-filter-title::before {
+    transform: rotate(90deg);
+  }
+
+  .owner-filter-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &.collapsed .owner-filter-body {
+    display: none;
   }
 
   .owner-filter-actions {
